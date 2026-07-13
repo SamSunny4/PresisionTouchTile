@@ -1,0 +1,593 @@
+{
+  "version": 3,
+  "targets": {
+    "net9.0-windows7.0": {
+      "CommunityToolkit.Mvvm/8.4.0": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/CommunityToolkit.Mvvm.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/CommunityToolkit.Mvvm.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "build": {
+          "buildTransitive/CommunityToolkit.Mvvm.targets": {}
+        }
+      },
+      "SharpGen.Runtime/2.4.2-beta": {
+        "type": "package",
+        "dependencies": {
+          "System.Text.Json": "9.0.1"
+        },
+        "compile": {
+          "lib/net9.0/SharpGen.Runtime.dll": {}
+        },
+        "runtime": {
+          "lib/net9.0/SharpGen.Runtime.dll": {}
+        },
+        "build": {
+          "build/_._": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/_._": {}
+        }
+      },
+      "SharpGen.Runtime.COM/2.4.2-beta": {
+        "type": "package",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "System.Text.Json": "9.0.1"
+        },
+        "compile": {
+          "lib/net9.0/SharpGen.Runtime.COM.dll": {}
+        },
+        "runtime": {
+          "lib/net9.0/SharpGen.Runtime.COM.dll": {}
+        },
+        "build": {
+          "build/_._": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/_._": {}
+        }
+      },
+      "System.Text.Json/9.0.5": {
+        "type": "package",
+        "compile": {
+          "lib/net9.0/System.Text.Json.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/System.Text.Json.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "buildTransitive/net8.0/System.Text.Json.targets": {}
+        }
+      },
+      "Vortice.D3DCompiler/3.8.1": {
+        "type": "package",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "Vortice.DirectX": "3.8.1"
+        },
+        "compile": {
+          "lib/net9.0/Vortice.D3DCompiler.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/Vortice.D3DCompiler.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "build/Vortice.D3DCompiler.props": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/Vortice.D3DCompiler.props": {}
+        }
+      },
+      "Vortice.Direct3D11/3.8.1": {
+        "type": "package",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "Vortice.DXGI": "3.8.1"
+        },
+        "compile": {
+          "lib/net9.0/Vortice.Direct3D11.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/Vortice.Direct3D11.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "build/Vortice.Direct3D11.props": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/Vortice.Direct3D11.props": {}
+        }
+      },
+      "Vortice.Direct3D9/3.8.1": {
+        "type": "package",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "SharpGen.Runtime.COM": "2.4.2-beta",
+          "Vortice.Mathematics": "2.0.0"
+        },
+        "compile": {
+          "lib/net9.0/Vortice.Direct3D9.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/Vortice.Direct3D9.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "build/Vortice.Direct3D9.props": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/Vortice.Direct3D9.props": {}
+        }
+      },
+      "Vortice.DirectX/3.8.1": {
+        "type": "package",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "SharpGen.Runtime.COM": "2.4.2-beta",
+          "Vortice.Mathematics": "2.0.0"
+        },
+        "compile": {
+          "lib/net9.0/Vortice.DirectX.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/Vortice.DirectX.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "build/_._": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/_._": {}
+        }
+      },
+      "Vortice.DXGI/3.8.1": {
+        "type": "package",
+        "dependencies": {
+          "SharpGen.Runtime": "2.4.2-beta",
+          "Vortice.DirectX": "3.8.1"
+        },
+        "compile": {
+          "lib/net9.0/Vortice.DXGI.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/Vortice.DXGI.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "build/Vortice.DXGI.props": {}
+        },
+        "buildMultiTargeting": {
+          "buildMultiTargeting/Vortice.DXGI.props": {}
+        }
+      },
+      "Vortice.Mathematics/2.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net9.0/Vortice.Mathematics.dll": {
+            "related": ".pdb;.xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/Vortice.Mathematics.dll": {
+            "related": ".pdb;.xml"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "CommunityToolkit.Mvvm/8.4.0": {
+      "sha512": "tqVU8yc/ADO9oiTRyTnwhFN68hCwvkliMierptWOudIAvWY1mWCh5VFh+guwHJmpMwfg0J0rY+yyd5Oy7ty9Uw==",
+      "type": "package",
+      "path": "communitytoolkit.mvvm/8.4.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "License.md",
+        "ThirdPartyNotices.txt",
+        "analyzers/dotnet/roslyn4.0/cs/CommunityToolkit.Mvvm.CodeFixers.dll",
+        "analyzers/dotnet/roslyn4.0/cs/CommunityToolkit.Mvvm.SourceGenerators.dll",
+        "analyzers/dotnet/roslyn4.12/cs/CommunityToolkit.Mvvm.CodeFixers.dll",
+        "analyzers/dotnet/roslyn4.12/cs/CommunityToolkit.Mvvm.SourceGenerators.dll",
+        "analyzers/dotnet/roslyn4.3/cs/CommunityToolkit.Mvvm.CodeFixers.dll",
+        "analyzers/dotnet/roslyn4.3/cs/CommunityToolkit.Mvvm.SourceGenerators.dll",
+        "build/CommunityToolkit.Mvvm.FeatureSwitches.targets",
+        "build/CommunityToolkit.Mvvm.SourceGenerators.targets",
+        "build/CommunityToolkit.Mvvm.Windows.targets",
+        "build/CommunityToolkit.Mvvm.WindowsSdk.targets",
+        "build/CommunityToolkit.Mvvm.targets",
+        "buildTransitive/CommunityToolkit.Mvvm.FeatureSwitches.targets",
+        "buildTransitive/CommunityToolkit.Mvvm.SourceGenerators.targets",
+        "buildTransitive/CommunityToolkit.Mvvm.Windows.targets",
+        "buildTransitive/CommunityToolkit.Mvvm.WindowsSdk.targets",
+        "buildTransitive/CommunityToolkit.Mvvm.targets",
+        "communitytoolkit.mvvm.8.4.0.nupkg.sha512",
+        "communitytoolkit.mvvm.nuspec",
+        "lib/net8.0-windows10.0.17763/CommunityToolkit.Mvvm.dll",
+        "lib/net8.0-windows10.0.17763/CommunityToolkit.Mvvm.pdb",
+        "lib/net8.0-windows10.0.17763/CommunityToolkit.Mvvm.xml",
+        "lib/net8.0/CommunityToolkit.Mvvm.dll",
+        "lib/net8.0/CommunityToolkit.Mvvm.pdb",
+        "lib/net8.0/CommunityToolkit.Mvvm.xml",
+        "lib/netstandard2.0/CommunityToolkit.Mvvm.dll",
+        "lib/netstandard2.0/CommunityToolkit.Mvvm.pdb",
+        "lib/netstandard2.0/CommunityToolkit.Mvvm.xml",
+        "lib/netstandard2.1/CommunityToolkit.Mvvm.dll",
+        "lib/netstandard2.1/CommunityToolkit.Mvvm.pdb",
+        "lib/netstandard2.1/CommunityToolkit.Mvvm.xml"
+      ]
+    },
+    "SharpGen.Runtime/2.4.2-beta": {
+      "sha512": "niTtWAUov1F7wZGAlVeEvW+Tnqvg5yTmhI7rxmYu2Utoyu2TbC9tWWpUpMs0PQg5lu5svoYpCAztNjxCqMFP/w==",
+      "type": "package",
+      "path": "sharpgen.runtime/2.4.2-beta",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "build/Mapping.xml",
+        "build/SharpGen.Runtime.props",
+        "buildMultiTargeting/SharpGen.Runtime.props",
+        "lib/net8.0/SharpGen.Runtime.dll",
+        "lib/net9.0/SharpGen.Runtime.dll",
+        "lib/netstandard2.0/SharpGen.Runtime.dll",
+        "lib/netstandard2.1/SharpGen.Runtime.dll",
+        "sharpgen.runtime.2.4.2-beta.nupkg.sha512",
+        "sharpgen.runtime.nuspec"
+      ]
+    },
+    "SharpGen.Runtime.COM/2.4.2-beta": {
+      "sha512": "9lxDFMiepqo3lJQzMSjECCIONeCc2f3Drokgj6HtrTLZcJSftNgcLbD6/iXYj2iphkwgrZb1oLsDOZxoFZkawQ==",
+      "type": "package",
+      "path": "sharpgen.runtime.com/2.4.2-beta",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "build/SharpGen.Runtime.COM.BindMapping.xml",
+        "build/SharpGen.Runtime.COM.props",
+        "buildMultiTargeting/SharpGen.Runtime.COM.props",
+        "lib/net462/SharpGen.Runtime.COM.dll",
+        "lib/net471/SharpGen.Runtime.COM.dll",
+        "lib/net8.0/SharpGen.Runtime.COM.dll",
+        "lib/net9.0/SharpGen.Runtime.COM.dll",
+        "lib/netstandard2.0/SharpGen.Runtime.COM.dll",
+        "lib/netstandard2.1/SharpGen.Runtime.COM.dll",
+        "sharpgen.runtime.com.2.4.2-beta.nupkg.sha512",
+        "sharpgen.runtime.com.nuspec"
+      ]
+    },
+    "System.Text.Json/9.0.5": {
+      "sha512": "rnP61ZfloTgPQPe7ecr36loNiGX3g1PocxlKHdY/FUpDSsExKkTxpMAlB4X35wNEPr1X7mkYZuQvW3Lhxmu7KA==",
+      "type": "package",
+      "path": "system.text.json/9.0.5",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "Icon.png",
+        "LICENSE.TXT",
+        "PACKAGE.md",
+        "THIRD-PARTY-NOTICES.TXT",
+        "analyzers/dotnet/roslyn3.11/cs/System.Text.Json.SourceGeneration.dll",
+        "analyzers/dotnet/roslyn3.11/cs/cs/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/de/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/es/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/fr/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/it/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/ja/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/ko/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/pl/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/pt-BR/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/ru/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/tr/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/zh-Hans/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn3.11/cs/zh-Hant/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/System.Text.Json.SourceGeneration.dll",
+        "analyzers/dotnet/roslyn4.0/cs/cs/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/de/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/es/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/fr/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/it/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/ja/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/ko/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/pl/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/pt-BR/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/ru/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/tr/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/zh-Hans/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.0/cs/zh-Hant/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/System.Text.Json.SourceGeneration.dll",
+        "analyzers/dotnet/roslyn4.4/cs/cs/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/de/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/es/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/fr/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/it/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/ja/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/ko/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/pl/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/pt-BR/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/ru/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/tr/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/zh-Hans/System.Text.Json.SourceGeneration.resources.dll",
+        "analyzers/dotnet/roslyn4.4/cs/zh-Hant/System.Text.Json.SourceGeneration.resources.dll",
+        "buildTransitive/net461/System.Text.Json.targets",
+        "buildTransitive/net462/System.Text.Json.targets",
+        "buildTransitive/net8.0/System.Text.Json.targets",
+        "buildTransitive/netcoreapp2.0/System.Text.Json.targets",
+        "buildTransitive/netstandard2.0/System.Text.Json.targets",
+        "lib/net462/System.Text.Json.dll",
+        "lib/net462/System.Text.Json.xml",
+        "lib/net8.0/System.Text.Json.dll",
+        "lib/net8.0/System.Text.Json.xml",
+        "lib/net9.0/System.Text.Json.dll",
+        "lib/net9.0/System.Text.Json.xml",
+        "lib/netstandard2.0/System.Text.Json.dll",
+        "lib/netstandard2.0/System.Text.Json.xml",
+        "system.text.json.9.0.5.nupkg.sha512",
+        "system.text.json.nuspec",
+        "useSharedDesignerContext.txt"
+      ]
+    },
+    "Vortice.D3DCompiler/3.8.1": {
+      "sha512": "mnXIuCytWaoNSdXpicaZL0M9KRwzBgyOpysKk9Km58JlLIm6t/vqSpukHp6oEBW/Tv8vdlWdQreF/Pn5vfg1pw==",
+      "type": "package",
+      "path": "vortice.d3dcompiler/3.8.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "build/Vortice.D3DCompiler.BindMapping.xml",
+        "build/Vortice.D3DCompiler.props",
+        "buildMultiTargeting/Vortice.D3DCompiler.props",
+        "lib/net10.0/Vortice.D3DCompiler.dll",
+        "lib/net10.0/Vortice.D3DCompiler.xml",
+        "lib/net9.0/Vortice.D3DCompiler.dll",
+        "lib/net9.0/Vortice.D3DCompiler.xml",
+        "vortice.d3dcompiler.3.8.1.nupkg.sha512",
+        "vortice.d3dcompiler.nuspec"
+      ]
+    },
+    "Vortice.Direct3D11/3.8.1": {
+      "sha512": "mysDbhXSTIF2YdNUOrzHVYKxTcSU2U9a30iLy3uTU8U3udl1jufaZZ3HRmyoFm7qVmRl2pu3aHjWmNUDo4ToXA==",
+      "type": "package",
+      "path": "vortice.direct3d11/3.8.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "build/Vortice.Direct3D11.BindMapping.xml",
+        "build/Vortice.Direct3D11.props",
+        "buildMultiTargeting/Vortice.Direct3D11.props",
+        "lib/net10.0/Vortice.Direct3D11.dll",
+        "lib/net10.0/Vortice.Direct3D11.xml",
+        "lib/net9.0/Vortice.Direct3D11.dll",
+        "lib/net9.0/Vortice.Direct3D11.xml",
+        "vortice.direct3d11.3.8.1.nupkg.sha512",
+        "vortice.direct3d11.nuspec"
+      ]
+    },
+    "Vortice.Direct3D9/3.8.1": {
+      "sha512": "c9BNvD8MYyJ9DCT2v22yKQ69s17v1ljxot7Gx7H0UC6wonaQgx9OKpEBUfvEnDgqYk2UCPJUp9DYWSrmaDyyQQ==",
+      "type": "package",
+      "path": "vortice.direct3d9/3.8.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "build/Vortice.Direct3D9.BindMapping.xml",
+        "build/Vortice.Direct3D9.props",
+        "buildMultiTargeting/Vortice.Direct3D9.props",
+        "lib/net10.0/Vortice.Direct3D9.dll",
+        "lib/net10.0/Vortice.Direct3D9.xml",
+        "lib/net9.0/Vortice.Direct3D9.dll",
+        "lib/net9.0/Vortice.Direct3D9.xml",
+        "vortice.direct3d9.3.8.1.nupkg.sha512",
+        "vortice.direct3d9.nuspec"
+      ]
+    },
+    "Vortice.DirectX/3.8.1": {
+      "sha512": "EtlZXbbuSYugPOolL7lgSrRkE7Xmo8ttnrsuH3uZC+xEqpSBm7F1SQroyBjhkLZstV9eSwoXpNyKLZUrt/gtXQ==",
+      "type": "package",
+      "path": "vortice.directx/3.8.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "build/Vortice.DirectX.BindMapping.xml",
+        "build/Vortice.DirectX.props",
+        "buildMultiTargeting/Vortice.DirectX.props",
+        "lib/net10.0-windows10.0.22621/Vortice.DirectX.dll",
+        "lib/net10.0-windows10.0.22621/Vortice.DirectX.xml",
+        "lib/net10.0/Vortice.DirectX.dll",
+        "lib/net10.0/Vortice.DirectX.xml",
+        "lib/net9.0-windows10.0.22621/Vortice.DirectX.dll",
+        "lib/net9.0-windows10.0.22621/Vortice.DirectX.xml",
+        "lib/net9.0/Vortice.DirectX.dll",
+        "lib/net9.0/Vortice.DirectX.xml",
+        "vortice.directx.3.8.1.nupkg.sha512",
+        "vortice.directx.nuspec"
+      ]
+    },
+    "Vortice.DXGI/3.8.1": {
+      "sha512": "To06vONM4kP/oBHVhsj2pd4Aj24oObiE2TyfvuPxThjpRBALgwh1qa61Fa2pVgKHyZDH3a3BbPRKekGRT+ae1A==",
+      "type": "package",
+      "path": "vortice.dxgi/3.8.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "build/Vortice.DXGI.BindMapping.xml",
+        "build/Vortice.DXGI.props",
+        "buildMultiTargeting/Vortice.DXGI.props",
+        "lib/net10.0-windows10.0.22621/Vortice.DXGI.dll",
+        "lib/net10.0-windows10.0.22621/Vortice.DXGI.xml",
+        "lib/net10.0/Vortice.DXGI.dll",
+        "lib/net10.0/Vortice.DXGI.xml",
+        "lib/net9.0-windows10.0.22621/Vortice.DXGI.dll",
+        "lib/net9.0-windows10.0.22621/Vortice.DXGI.xml",
+        "lib/net9.0/Vortice.DXGI.dll",
+        "lib/net9.0/Vortice.DXGI.xml",
+        "vortice.dxgi.3.8.1.nupkg.sha512",
+        "vortice.dxgi.nuspec"
+      ]
+    },
+    "Vortice.Mathematics/2.0.0": {
+      "sha512": "I+ctNBG8qLWRlaQgLRiS08HZTiuTdvlrYhrxp5B7uOJHD0QQaDxRfrV0cq4xxKyj+9+jqJZMy28l/NwvsgyVlQ==",
+      "type": "package",
+      "path": "vortice.mathematics/2.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0-windows10.0.19041/Vortice.Mathematics.dll",
+        "lib/net10.0-windows10.0.19041/Vortice.Mathematics.pdb",
+        "lib/net10.0-windows10.0.19041/Vortice.Mathematics.xml",
+        "lib/net10.0/Vortice.Mathematics.dll",
+        "lib/net10.0/Vortice.Mathematics.pdb",
+        "lib/net10.0/Vortice.Mathematics.xml",
+        "lib/net9.0-windows10.0.19041/Vortice.Mathematics.dll",
+        "lib/net9.0-windows10.0.19041/Vortice.Mathematics.pdb",
+        "lib/net9.0-windows10.0.19041/Vortice.Mathematics.xml",
+        "lib/net9.0/Vortice.Mathematics.dll",
+        "lib/net9.0/Vortice.Mathematics.pdb",
+        "lib/net9.0/Vortice.Mathematics.xml",
+        "vortice.mathematics.2.0.0.nupkg.sha512",
+        "vortice.mathematics.nuspec"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net9.0-windows7.0": [
+      "CommunityToolkit.Mvvm >= 8.4.0",
+      "System.Text.Json >= 9.0.5",
+      "Vortice.D3DCompiler >= 3.8.1",
+      "Vortice.DXGI >= 3.8.1",
+      "Vortice.Direct3D11 >= 3.8.1",
+      "Vortice.Direct3D9 >= 3.8.1",
+      "Vortice.Mathematics >= 2.0.0"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\samsu\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "E:\\touch\\src\\TouchpadVisualizer\\TouchpadVisualizer.csproj",
+      "projectName": "TouchpadVisualizer",
+      "projectPath": "E:\\touch\\src\\TouchpadVisualizer\\TouchpadVisualizer.csproj",
+      "packagesPath": "C:\\Users\\samsu\\.nuget\\packages\\",
+      "outputPath": "E:\\touch\\src\\TouchpadVisualizer\\obj\\",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "C:\\Users\\samsu\\AppData\\Roaming\\NuGet\\NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net9.0-windows"
+      ],
+      "sources": {
+        "C:\\Program Files\\dotnet\\library-packs": {},
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net9.0-windows7.0": {
+          "targetAlias": "net9.0-windows",
+          "projectReferences": {}
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "9.0.300"
+    },
+    "frameworks": {
+      "net9.0-windows7.0": {
+        "targetAlias": "net9.0-windows",
+        "dependencies": {
+          "CommunityToolkit.Mvvm": {
+            "target": "Package",
+            "version": "[8.4.0, )"
+          },
+          "System.Text.Json": {
+            "target": "Package",
+            "version": "[9.0.5, )"
+          },
+          "Vortice.D3DCompiler": {
+            "target": "Package",
+            "version": "[3.8.1, )"
+          },
+          "Vortice.DXGI": {
+            "target": "Package",
+            "version": "[3.8.1, )"
+          },
+          "Vortice.Direct3D11": {
+            "target": "Package",
+            "version": "[3.8.1, )"
+          },
+          "Vortice.Direct3D9": {
+            "target": "Package",
+            "version": "[3.8.1, )"
+          },
+          "Vortice.Mathematics": {
+            "target": "Package",
+            "version": "[2.0.0, )"
+          }
+        },
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          },
+          "Microsoft.WindowsDesktop.App.WPF": {
+            "privateAssets": "none"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

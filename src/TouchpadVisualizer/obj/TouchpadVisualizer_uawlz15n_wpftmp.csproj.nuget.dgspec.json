@@ -1,0 +1,97 @@
+{
+  "format": 1,
+  "restore": {
+    "E:\\touch\\src\\TouchpadVisualizer\\TouchpadVisualizer.csproj": {}
+  },
+  "projects": {
+    "E:\\touch\\src\\TouchpadVisualizer\\TouchpadVisualizer.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "E:\\touch\\src\\TouchpadVisualizer\\TouchpadVisualizer.csproj",
+        "projectName": "TouchpadVisualizer",
+        "projectPath": "E:\\touch\\src\\TouchpadVisualizer\\TouchpadVisualizer.csproj",
+        "packagesPath": "C:\\Users\\samsu\\.nuget\\packages\\",
+        "outputPath": "E:\\touch\\src\\TouchpadVisualizer\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\samsu\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net9.0-windows"
+        ],
+        "sources": {
+          "C:\\Program Files\\dotnet\\library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net9.0-windows7.0": {
+            "targetAlias": "net9.0-windows",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net9.0-windows7.0": {
+          "targetAlias": "net9.0-windows",
+          "dependencies": {
+            "CommunityToolkit.Mvvm": {
+              "target": "Package",
+              "version": "[8.4.0, )"
+            },
+            "System.Text.Json": {
+              "target": "Package",
+              "version": "[9.0.5, )"
+            },
+            "Vortice.D3DCompiler": {
+              "target": "Package",
+              "version": "[3.8.1, )"
+            },
+            "Vortice.DXGI": {
+              "target": "Package",
+              "version": "[3.8.1, )"
+            },
+            "Vortice.Direct3D11": {
+              "target": "Package",
+              "version": "[3.8.1, )"
+            },
+            "Vortice.Mathematics": {
+              "target": "Package",
+              "version": "[2.0.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            },
+            "Microsoft.WindowsDesktop.App.WPF": {
+              "privateAssets": "none"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.308/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
