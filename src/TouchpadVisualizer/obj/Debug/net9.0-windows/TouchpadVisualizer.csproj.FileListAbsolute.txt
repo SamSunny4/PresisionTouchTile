@@ -37,3 +37,4 @@ E:\touch\src\TouchpadVisualizer\obj\Debug\net9.0-windows\ref\TouchpadVisualizer.
 E:\touch\src\TouchpadVisualizer\bin\Debug\net9.0-windows\Vortice.Direct3D9.dll
 E:\touch\src\TouchpadVisualizer\obj\Debug\net9.0-windows\Views\PianoTilesWindow.baml
 E:\touch\src\TouchpadVisualizer\obj\Debug\net9.0-windows\Views\PianoTilesWindow.g.cs
+e:\touch\src\TouchpadVisualizer\obj\Debug\net9.0-windows\TouchpadVisualizer.sourcelink.json
