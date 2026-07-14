@@ -572,6 +572,9 @@ public class SongPattern
             AddInterstellarBar(ref t, 72, 3, 76, 3, 81, 0, 4); // A5 super hold
         }
 
+        // Final dramatic drop
+        AddInterstellarBar(ref t, 69, 0, 72, 2, 76, 3, 4);
+
         return new SongPattern
         {
             Name = "Cornfield Chase",
@@ -646,6 +649,15 @@ public class SongPattern
 
         AddPiratesPhrase(ref t);
         AddPiratesPhrase2(ref t);
+        
+        // Repeat phrase
+        AddPiratesPhrase(ref t);
+
+        // Final dramatic ending
+        events.Add(new TileEvent(t, 2, 60)); t += beat;
+        events.Add(new TileEvent(t, 2, 60)); t += beat;
+        events.Add(new TileEvent(t, 2, 60)); t += beat * 2;
+        events.Add(new TileEvent(t, 0, 57, beat * 8)); t += beat * 10; // A3 massive hold
 
         return new SongPattern
         {

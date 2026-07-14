@@ -37,7 +37,8 @@ public partial class PianoTilesWindow : Window
 
     // ─── Settings State ────────────────────────────────────────────
     private int _selectedLaneCount = PianoTilesGame.DefaultLaneCount;
-    private bool _easyModeEnabled;
+    private bool _easyModeEnabled = false;
+    private bool _autopilotEnabled = false;
     private readonly Border[] _laneCountButtons = new Border[PianoTilesGame.MaxLanes - PianoTilesGame.MinLanes + 1];
     private int _menuSelectedSongIndex = 0;
     private readonly List<Border> _songMenuBorders = new();
@@ -388,11 +389,17 @@ public partial class PianoTilesWindow : Window
     {
         _easyModeEnabled = !_easyModeEnabled;
         UpdateEasyModeToggleVisual();
+        UpdateControlsHint();
     }
 
     private void UpdateEasyModeToggleVisual()
     {
-        if (_easyModeEnabled)
+        string modeText = $"{_selectedLaneCount} LANES";
+        if (_autopilotEnabled) modeText = "AUTOPILOT  •  " + modeText;
+        else if (_easyModeEnabled) modeText = "EASY MODE  •  " + modeText;
+        ModeIndicatorText.Text = modeText;
+
+        if (_easyModeEnabled || _autopilotEnabled)
         {
             EasyModeToggle.Background = new SolidColorBrush(Color.FromArgb(25, 57, 255, 20));
             EasyModeToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 57, 255, 20));
@@ -442,7 +449,7 @@ public partial class PianoTilesWindow : Window
             ControlsHintText.Inlines.Add(new System.Windows.Documents.Run("Easy Mode: tiles wait for your input") { Foreground = new SolidColorBrush(Color.FromRgb(57, 255, 20)) });
         }
         ControlsHintText.Inlines.Add(new System.Windows.Documents.LineBreak());
-        var menuHint = new System.Windows.Documents.Run("Menu: [↑/↓] Select, [Enter] Play, [3-6] Lanes, [E] Easy Mode");
+        var menuHint = new System.Windows.Documents.Run("Menu: [↑/↓] Select, [Enter] Play, [3-6] Lanes, [E] Easy Mode, [A] Autopilot");
         menuHint.Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
         ControlsHintText.Inlines.Add(menuHint);
     }
@@ -567,6 +574,7 @@ public partial class PianoTilesWindow : Window
         // Apply settings
         _game.SetLaneCount(_selectedLaneCount);
         _game.EasyMode = _easyModeEnabled;
+        _game.Autopilot = _autopilotEnabled;
 
         // Remap song lanes if needed
         var remappedSong = song.RemapToLanes(_selectedLaneCount);
@@ -585,7 +593,10 @@ public partial class PianoTilesWindow : Window
 
         SongNameText.Text = song.Name;
         SongArtistText.Text = song.Artist;
-        ModeIndicatorText.Text = _easyModeEnabled ? $"EASY MODE  •  {_selectedLaneCount} LANES" : $"{_selectedLaneCount} LANES";
+        string modeText = $"{_selectedLaneCount} LANES";
+        if (_autopilotEnabled) modeText = "AUTOPILOT  •  " + modeText;
+        else if (_easyModeEnabled) modeText = "EASY MODE  •  " + modeText;
+        ModeIndicatorText.Text = modeText;
         ScoreText.Text = "0";
         ComboText.Text = "";
         WaitingIndicator.Opacity = 0;
@@ -657,8 +668,19 @@ public partial class PianoTilesWindow : Window
 
                 case Key.E:
                     _easyModeEnabled = !_easyModeEnabled;
+                    if (_easyModeEnabled) _autopilotEnabled = false; // Mutually exclusive
                     UpdateEasyModeToggleVisual();
                     UpdateControlsHint();
+                    if (_game != null) _game.Autopilot = _autopilotEnabled;
+                    e.Handled = true;
+                    return;
+
+                case Key.A:
+                    _autopilotEnabled = !_autopilotEnabled;
+                    if (_autopilotEnabled) _easyModeEnabled = false; // Mutually exclusive
+                    UpdateEasyModeToggleVisual();
+                    UpdateControlsHint();
+                    if (_game != null) _game.Autopilot = _autopilotEnabled;
                     e.Handled = true;
                     return;
 

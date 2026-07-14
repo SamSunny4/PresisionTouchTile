@@ -57,6 +57,9 @@ public class PianoTilesGame
     /// <summary>The lane of the tile that is currently waiting for input in Easy Mode.</summary>
     public int WaitingLane { get; private set; } = -1;
 
+    // ─── Autopilot State ──────────────────────────────────────────
+    public bool Autopilot { get; set; } = false;
+
     // ─── Key Held State ───────────────────────────────────────────
     private readonly bool[] _isLaneHeld = new bool[MaxLanes];
 
@@ -216,8 +219,40 @@ public class PianoTilesGame
                     double timeSinceSpawn = currentTime - (tile.TargetTimeMs - ScrollDurationMs * HitZoneY);
                     tile.YPosition = timeSinceSpawn / ScrollDurationMs;
 
+                    // ─── Autopilot: auto-hit the tile ───────────────
+                    if (Autopilot)
+                    {
+                        if (tile.YPosition >= HitZoneY)
+                        {
+                            if (tile.IsHoldNote)
+                            {
+                                tile.State = TileState.Holding;
+                                tile.AnimProgress = 0;
+                                LastHitQuality = TileState.Holding;
+                                LastHitTime = currentTime;
+                                LastHitLane = tile.Lane;
+                                OnTileHit?.Invoke(tile, TileState.Holding);
+                                SetLaneHeld(tile.Lane, true);
+                            }
+                            else
+                            {
+                                tile.State = TileState.HitPerfect;
+                                tile.AnimProgress = 0;
+                                PerfectCount++;
+                                Combo++;
+                                if (Combo > MaxCombo) MaxCombo = Combo;
+                                OnComboChanged?.Invoke(Combo);
+                                double comboMultiplier = 1.0 + (Combo / 10.0) * 0.5;
+                                Score += (int)(100 * comboMultiplier);
+                                LastHitQuality = TileState.HitPerfect;
+                                LastHitTime = currentTime;
+                                LastHitLane = tile.Lane;
+                                OnTileHit?.Invoke(tile, TileState.HitPerfect);
+                            }
+                        }
+                    }
                     // ─── Easy Mode: freeze tile at hit zone ───────────────
-                    if (EasyMode)
+                    else if (EasyMode)
                     {
                         if (tile.YPosition >= HitZoneY)
                         {
@@ -250,6 +285,11 @@ public class PianoTilesGame
                 }
                 else if (tile.State == TileState.Holding)
                 {
+                    if (Autopilot && currentTime >= tile.TargetTimeMs + tile.DurationMs)
+                    {
+                        SetLaneHeld(tile.Lane, false);
+                    }
+
                     // If player released the hold early:
                     if (!_isLaneHeld[tile.Lane])
                     {
