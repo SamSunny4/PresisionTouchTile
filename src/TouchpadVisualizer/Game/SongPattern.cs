@@ -550,7 +550,7 @@ public class SongPattern
         }
 
         // Loop the theme a few times with variations
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 6; i++)
         {
             // Bar 1: A4, C5, E5 (hold 2 beats)
             AddInterstellarBar(ref t, 69, 0, 72, 2, 76, 3, 2);
@@ -564,7 +564,7 @@ public class SongPattern
 
         // B-Section climax
         // G4, B4, D5 (hold), A4, C5, E5 (hold)
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 4; i++)
         {
             AddInterstellarBar(ref t, 67, 0, 71, 1, 74, 2, 2);
             AddInterstellarBar(ref t, 69, 1, 72, 2, 76, 3, 2);
@@ -652,6 +652,10 @@ public class SongPattern
         
         // Repeat phrase
         AddPiratesPhrase(ref t);
+        AddPiratesPhrase2(ref t);
+        AddPiratesPhrase(ref t);
+        AddPiratesPhrase2(ref t);
+        AddPiratesPhrase(ref t);
 
         // Final dramatic ending
         events.Add(new TileEvent(t, 2, 60)); t += beat;
@@ -704,6 +708,8 @@ public class SongPattern
             events.Add(new TileEvent(time, 3, 55, beat * 2)); time += beat * 3; // G3 hold
         }
 
+        AddAvengersMainMotif(ref t);
+        AddAvengersMainMotif(ref t);
         AddAvengersMainMotif(ref t);
         
         // Repetition with higher pitch climax (A4, E5, D5)

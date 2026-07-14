@@ -42,6 +42,7 @@ public class MidiPlayer : IDisposable
         {
             // Set instrument to Acoustic Grand Piano (Program 0) on channel 0
             SetInstrument(0, 0);
+            SetVolume(127, 0); // Max volume!
             Debug.WriteLine("[MidiPlayer] Opened successfully.");
         }
         else
@@ -104,6 +105,20 @@ public class MidiPlayer : IDisposable
         NoteOn(note, velocity, channel);
         await Task.Delay(durationMs);
         NoteOff(note, channel);
+    }
+
+    /// <summary>
+    /// Sets channel volume (Control Change #7). volume ranges from 0 to 127.
+    /// </summary>
+    public void SetVolume(byte volume, byte channel = 0)
+    {
+        if (!_isOpen) return;
+        lock (_lock)
+        {
+            // Control Change: 0xB0 | channel, CC number (7), value
+            int msg = 0xB0 | (channel & 0x0F) | (7 << 8) | ((volume & 0x7F) << 16);
+            midiOutShortMsg(_handle, msg);
+        }
     }
 
     /// <summary>

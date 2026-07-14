@@ -215,6 +215,30 @@
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
+                            
+                            <!-- Autopilot Toggle -->
+                            <Border x:Name="AutopilotToggle" Padding="14,10" CornerRadius="8"
+                                    Cursor="Hand" HorizontalAlignment="Center" Margin="0,10,0,0"
+                                    Background="#0AFFFFFF" BorderThickness="1"
+                                    MouseLeftButtonDown="AutopilotToggle_Click">
+                                <Border.BorderBrush>
+                                    <SolidColorBrush Color="#FFFFFF" Opacity="0.06"/>
+                                </Border.BorderBrush>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="AutopilotIcon" Text="○" Foreground="#50FFFFFF"
+                                               FontFamily="{StaticResource GameFont}" FontSize="16"
+                                               FontWeight="Bold" VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <StackPanel>
+                                        <TextBlock Text="AUTOPILOT" Foreground="#80FFFFFF"
+                                                   FontFamily="{StaticResource GameFont}" FontSize="12"
+                                                   FontWeight="SemiBold"/>
+                                        <TextBlock Text="Game plays itself perfectly"
+                                                   Foreground="#35FFFFFF" FontFamily="{StaticResource GameFont}"
+                                                   FontSize="10"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
                 </Border>

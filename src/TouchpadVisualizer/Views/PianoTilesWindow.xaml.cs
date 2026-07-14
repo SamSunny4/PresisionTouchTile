@@ -182,7 +182,7 @@ public partial class PianoTilesWindow : Window
 
         // Build settings UI
         BuildLaneCountSelector();
-        UpdateEasyModeToggleVisual();
+        UpdateToggleVisuals();
         UpdateKeyLabels();
         UpdateControlsHint();
 
@@ -388,18 +388,28 @@ public partial class PianoTilesWindow : Window
     private void EasyModeToggle_Click(object sender, MouseButtonEventArgs e)
     {
         _easyModeEnabled = !_easyModeEnabled;
-        UpdateEasyModeToggleVisual();
+        if (_easyModeEnabled) _autopilotEnabled = false;
+        UpdateToggleVisuals();
         UpdateControlsHint();
     }
 
-    private void UpdateEasyModeToggleVisual()
+    private void AutopilotToggle_Click(object sender, MouseButtonEventArgs e)
+    {
+        _autopilotEnabled = !_autopilotEnabled;
+        if (_autopilotEnabled) _easyModeEnabled = false;
+        UpdateToggleVisuals();
+        UpdateControlsHint();
+    }
+
+    private void UpdateToggleVisuals()
     {
         string modeText = $"{_selectedLaneCount} LANES";
         if (_autopilotEnabled) modeText = "AUTOPILOT  •  " + modeText;
         else if (_easyModeEnabled) modeText = "EASY MODE  •  " + modeText;
         ModeIndicatorText.Text = modeText;
 
-        if (_easyModeEnabled || _autopilotEnabled)
+        // Easy Mode Visuals
+        if (_easyModeEnabled)
         {
             EasyModeToggle.Background = new SolidColorBrush(Color.FromArgb(25, 57, 255, 20));
             EasyModeToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 57, 255, 20));
@@ -412,6 +422,25 @@ public partial class PianoTilesWindow : Window
             EasyModeToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(15, 255, 255, 255));
             EasyModeIcon.Text = "○";
             EasyModeIcon.Foreground = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
+        }
+
+        // Autopilot Visuals
+        if (_autopilotEnabled)
+        {
+            AutopilotToggle.Background = new SolidColorBrush(Color.FromArgb(25, 0, 191, 255)); // Deep Sky Blue
+            AutopilotToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 191, 255));
+            AutopilotIcon.Text = "●";
+            AutopilotIcon.Foreground = new SolidColorBrush(Color.FromRgb(0, 191, 255));
+        }
+        else
+        {
+            if (AutopilotToggle != null)
+            {
+                AutopilotToggle.Background = new SolidColorBrush(Color.FromArgb(10, 255, 255, 255));
+                AutopilotToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(15, 255, 255, 255));
+                AutopilotIcon.Text = "○";
+                AutopilotIcon.Foreground = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
+            }
         }
     }
 
@@ -669,7 +698,7 @@ public partial class PianoTilesWindow : Window
                 case Key.E:
                     _easyModeEnabled = !_easyModeEnabled;
                     if (_easyModeEnabled) _autopilotEnabled = false; // Mutually exclusive
-                    UpdateEasyModeToggleVisual();
+                    UpdateToggleVisuals();
                     UpdateControlsHint();
                     if (_game != null) _game.Autopilot = _autopilotEnabled;
                     e.Handled = true;
@@ -678,7 +707,7 @@ public partial class PianoTilesWindow : Window
                 case Key.A:
                     _autopilotEnabled = !_autopilotEnabled;
                     if (_autopilotEnabled) _easyModeEnabled = false; // Mutually exclusive
-                    UpdateEasyModeToggleVisual();
+                    UpdateToggleVisuals();
                     UpdateControlsHint();
                     if (_game != null) _game.Autopilot = _autopilotEnabled;
                     e.Handled = true;
@@ -819,11 +848,11 @@ public partial class PianoTilesWindow : Window
             if (result.Tile.IsHoldNote)
             {
                 // Sustain note (holding)
-                _midi.NoteOn(result.Tile.MidiNote, 100);
+                _midi.NoteOn(result.Tile.MidiNote, 127);
             }
             else
             {
-                byte velocity = result.Quality == TileState.HitPerfect ? (byte)110 : (byte)85;
+                byte velocity = result.Quality == TileState.HitPerfect ? (byte)127 : (byte)105;
                 _midi.PlayNote(result.Tile.MidiNote, velocity, 400);
             }
 
@@ -861,15 +890,55 @@ public partial class PianoTilesWindow : Window
 
     private void OnTileHit(Tile tile, TileState quality)
     {
-        if (tile.IsHoldNote && quality == TileState.HitPerfect)
+        Dispatcher.BeginInvoke(() =>
         {
-            Dispatcher.BeginInvoke(() =>
+            if (_game.Autopilot)
             {
-                _midi.NoteOff(tile.MidiNote);
-                ShowHitFeedback("HOLD COMPLETE", Color.FromRgb(57, 255, 20));
-                SpawnHitParticles(tile.Lane, Color.FromRgb(57, 255, 20));
-            });
-        }
+                if (tile.IsHoldNote)
+                {
+                    if (quality == TileState.Holding)
+                    {
+                        // Start hold sustain sound (max velocity 127)
+                        _midi.NoteOn(tile.MidiNote, 127);
+                        ShowHitFeedback("HOLD", Color.FromRgb(0, 245, 255));
+                        SpawnHitParticles(tile.Lane, Color.FromRgb(0, 245, 255));
+                        FlashLane(tile.Lane);
+                    }
+                    else if (quality == TileState.HitPerfect)
+                    {
+                        // Finish hold note sound
+                        _midi.NoteOff(tile.MidiNote);
+                        ShowHitFeedback("HOLD COMPLETE", Color.FromRgb(57, 255, 20));
+                        SpawnHitParticles(tile.Lane, Color.FromRgb(57, 255, 20));
+                    }
+                }
+                else
+                {
+                    // Tap note (max velocity 127, duration 400ms)
+                    _midi.PlayNote(tile.MidiNote, 127, 400);
+                    ShowHitFeedback("PERFECT", Color.FromRgb(0, 245, 255));
+                    SpawnHitParticles(tile.Lane, Color.FromRgb(0, 245, 255));
+                    FlashLane(tile.Lane);
+                }
+
+                // Update score
+                ScoreText.Text = _game.Score.ToString();
+                if (_game.Combo > 1)
+                    ComboText.Text = $"COMBO \u00D7{_game.Combo}";
+                else
+                    ComboText.Text = "";
+            }
+            else
+            {
+                // Manual mode, only handle Hold Complete NoteOff here
+                if (tile.IsHoldNote && quality == TileState.HitPerfect)
+                {
+                    _midi.NoteOff(tile.MidiNote);
+                    ShowHitFeedback("HOLD COMPLETE", Color.FromRgb(57, 255, 20));
+                    SpawnHitParticles(tile.Lane, Color.FromRgb(57, 255, 20));
+                }
+            }
+        });
     }
 
     private void OnTileMissed(Tile tile)
