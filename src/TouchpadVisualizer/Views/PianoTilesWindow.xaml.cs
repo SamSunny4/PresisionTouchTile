@@ -195,6 +195,7 @@ public partial class PianoTilesWindow : Window
         if (_touchInput != null)
         {
             _touchInput.TouchDown += OnTouchDown;
+            _touchInput.TouchUp += OnTouchUp;
         }
 
         // Wire game events
@@ -727,6 +728,7 @@ public partial class PianoTilesWindow : Window
                     {
                         if (e.Key == keys[i])
                         {
+                            _game.SetLaneHeld(i, true);
                             HandleLaneInput(i);
                             break;
                         }
@@ -741,6 +743,19 @@ public partial class PianoTilesWindow : Window
     protected override void OnKeyUp(KeyEventArgs e)
     {
         _heldKeys.Remove(e.Key);
+
+        if (LaneKeyMappings.TryGetValue(_selectedLaneCount, out var keys))
+        {
+            for (int i = 0; i < keys.Length; i++)
+            {
+                if (e.Key == keys[i])
+                {
+                    _game.SetLaneHeld(i, false);
+                    break;
+                }
+            }
+        }
+
         base.OnKeyUp(e);
     }
 
@@ -753,7 +768,17 @@ public partial class PianoTilesWindow : Window
         }
 
         int lane = _game.GetLaneFromTouchX(contact.NormalizedX);
+        _game.SetLaneHeld(lane, true);
         Dispatcher.BeginInvoke(() => HandleLaneInput(lane));
+    }
+
+    private void OnTouchUp(object? sender, TouchContact contact)
+    {
+        if (_game.State != PianoTilesGame.GameState.Playing)
+            return;
+
+        int lane = _game.GetLaneFromTouchX(contact.NormalizedX);
+        _game.SetLaneHeld(lane, false);
     }
 
     private void HandleLaneInput(int lane)
@@ -769,14 +794,24 @@ public partial class PianoTilesWindow : Window
         if (result.IsHit && result.Tile != null)
         {
             // Play the note
-            byte velocity = result.Quality == TileState.HitPerfect ? (byte)110 : (byte)85;
-            _midi.PlayNote(result.Tile.MidiNote, velocity, 400);
+            if (result.Tile.IsHoldNote)
+            {
+                // Sustain note (holding)
+                _midi.NoteOn(result.Tile.MidiNote, 100);
+            }
+            else
+            {
+                byte velocity = result.Quality == TileState.HitPerfect ? (byte)110 : (byte)85;
+                _midi.PlayNote(result.Tile.MidiNote, velocity, 400);
+            }
 
             // Visual feedback
-            if (result.Quality == TileState.HitPerfect)
+            if (result.Quality == TileState.HitPerfect || result.Quality == TileState.Holding)
             {
-                ShowHitFeedback("PERFECT", Color.FromRgb(0, 245, 255));
-                SpawnHitParticles(lane, Color.FromRgb(0, 245, 255));
+                string text = result.Quality == TileState.Holding ? "HOLD" : "PERFECT";
+                Color c = Color.FromRgb(0, 245, 255);
+                ShowHitFeedback(text, c);
+                SpawnHitParticles(lane, c);
             }
             else
             {
@@ -804,13 +839,26 @@ public partial class PianoTilesWindow : Window
 
     private void OnTileHit(Tile tile, TileState quality)
     {
-        // Already handled in HandleLaneInput
+        if (tile.IsHoldNote && quality == TileState.HitPerfect)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                _midi.NoteOff(tile.MidiNote);
+                ShowHitFeedback("HOLD COMPLETE", Color.FromRgb(57, 255, 20));
+                SpawnHitParticles(tile.Lane, Color.FromRgb(57, 255, 20));
+            });
+        }
     }
 
     private void OnTileMissed(Tile tile)
     {
         Dispatcher.BeginInvoke(() =>
         {
+            if (tile.IsHoldNote)
+            {
+                _midi.NoteOff(tile.MidiNote);
+            }
+
             ShowHitFeedback("MISS", Color.FromRgb(255, 23, 68));
             ComboText.Text = "";
 
@@ -921,6 +969,12 @@ public partial class PianoTilesWindow : Window
         // Update game state
         _game.Update(delta * 1000);
 
+        // Update score display in case it ticks up during holding
+        if (_game.State == PianoTilesGame.GameState.Playing)
+        {
+            ScoreText.Text = _game.Score.ToString();
+        }
+
         // Update visuals — order matters for layering
         UpdateTileVisuals();
         UpdateParticles(delta);
@@ -968,81 +1022,200 @@ public partial class PianoTilesWindow : Window
             visual.Visibility = Visibility.Visible;
 
             double x = tile.Lane * _laneWidth + 2;
-            double y = tile.YPosition * _screenHeight - tilePixelHeight;
+            double laneWidthMinusGap = _laneWidth - 4;
 
-            Canvas.SetLeft(visual, x);
-            Canvas.SetTop(visual, y);
-            visual.Width = laneWidthMinusGap;
-            visual.Height = tilePixelHeight;
+            if (tile.IsHoldNote)
+            {
+                double holdHeight = (tile.DurationMs / PianoTilesGame.ScrollDurationMs) * _screenHeight;
+                double height = holdHeight;
+                double y;
+
+                if (tile.State == TileState.Holding)
+                {
+                    double bottomY = _screenHeight * PianoTilesGame.HitZoneY;
+                    double timePastTarget = _game.ElapsedMs - tile.TargetTimeMs;
+                    double remainingTime = tile.DurationMs - timePastTarget;
+                    height = (remainingTime / PianoTilesGame.ScrollDurationMs) * _screenHeight;
+                    height = Math.Max(tilePixelHeight, height);
+                    y = bottomY - height;
+
+                    if (_rng.NextDouble() < 0.25)
+                    {
+                        SpawnHitParticles(tile.Lane, Color.FromRgb(0, 255, 128));
+                    }
+                }
+                else
+                {
+                    height = Math.Max(tilePixelHeight, holdHeight);
+                    y = tile.YPosition * _screenHeight - height;
+                }
+
+                Canvas.SetLeft(visual, x);
+                Canvas.SetTop(visual, y);
+                visual.Width = laneWidthMinusGap;
+                visual.Height = height;
+            }
+            else
+            {
+                double y = tile.YPosition * _screenHeight - tilePixelHeight;
+                Canvas.SetLeft(visual, x);
+                Canvas.SetTop(visual, y);
+                visual.Width = laneWidthMinusGap;
+                visual.Height = tilePixelHeight;
+            }
 
             // Style based on state — use cached brushes
             var laneColor = LaneColors[tile.Lane % LaneColors.Length];
 
-            switch (tile.State)
+            if (tile.IsHoldNote)
             {
-                case TileState.Active:
-                    tv.BgBrush.Color = Color.FromRgb(18, 18, 28);
-                    tv.BorderBrush.Color = Color.FromArgb(60, laneColor.R, laneColor.G, laneColor.B);
-                    visual.Opacity = 1;
-                    if (tv.Shadow != null)
-                    {
-                        tv.Shadow.Color = laneColor;
-                        tv.Shadow.BlurRadius = 12;
-                        tv.Shadow.Opacity = 0.3;
-                    }
-
-                    // In Easy Mode, highlight the waiting tile
-                    if (_game.EasyMode && _game.IsWaitingForInput && tile.Lane == _game.WaitingLane
-                        && tile.YPosition >= PianoTilesGame.HitZoneY - 0.01)
-                    {
-                        tv.BorderBrush.Color = Color.FromArgb(150, laneColor.R, laneColor.G, laneColor.B);
+                switch (tile.State)
+                {
+                    case TileState.Active:
+                        tv.BgBrush.Color = Color.FromArgb(50, laneColor.R, laneColor.G, laneColor.B);
+                        tv.BorderBrush.Color = Color.FromArgb(180, laneColor.R, laneColor.G, laneColor.B);
+                        visual.Opacity = 1;
                         if (tv.Shadow != null)
                         {
-                            tv.Shadow.BlurRadius = 25;
-                            tv.Shadow.Opacity = 0.7;
+                            tv.Shadow.Color = laneColor;
+                            tv.Shadow.BlurRadius = 15;
+                            tv.Shadow.Opacity = 0.5;
                         }
-                    }
-                    break;
 
-                case TileState.HitPerfect:
-                    byte alphaBg = (byte)(255 * (1 - tile.AnimProgress));
-                    byte alphaBorder = (byte)(100 * (1 - tile.AnimProgress));
-                    tv.BgBrush.Color = Color.FromArgb(alphaBg, 0, 245, 255);
-                    tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 0, 245, 255);
-                    visual.Opacity = 1 - tile.AnimProgress;
-                    if (tv.Shadow != null)
-                    {
-                        tv.Shadow.Color = Color.FromRgb(0, 245, 255);
-                        tv.Shadow.BlurRadius = 30 + tile.AnimProgress * 20;
-                        tv.Shadow.Opacity = 0.8 * (1 - tile.AnimProgress);
-                    }
-                    break;
+                        // In Easy Mode, highlight the waiting tile
+                        if (_game.EasyMode && _game.IsWaitingForInput && tile.Lane == _game.WaitingLane
+                            && tile.YPosition >= PianoTilesGame.HitZoneY - 0.01)
+                        {
+                            tv.BorderBrush.Color = Color.FromArgb(230, laneColor.R, laneColor.G, laneColor.B);
+                            if (tv.Shadow != null)
+                            {
+                                tv.Shadow.BlurRadius = 30;
+                                tv.Shadow.Opacity = 0.9;
+                            }
+                        }
+                        break;
 
-                case TileState.HitGood:
-                    alphaBg = (byte)(255 * (1 - tile.AnimProgress));
-                    alphaBorder = (byte)(80 * (1 - tile.AnimProgress));
-                    tv.BgBrush.Color = Color.FromArgb(alphaBg, 132, 94, 247);
-                    tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 132, 94, 247);
-                    visual.Opacity = 1 - tile.AnimProgress;
-                    if (tv.Shadow != null)
-                    {
-                        tv.Shadow.Color = Color.FromRgb(132, 94, 247);
-                        tv.Shadow.BlurRadius = 20 + tile.AnimProgress * 15;
-                        tv.Shadow.Opacity = 0.6 * (1 - tile.AnimProgress);
-                    }
-                    break;
+                    case TileState.Holding:
+                        tv.BgBrush.Color = Color.FromArgb(160, 0, 255, 128); // Bright emerald hold fill
+                        tv.BorderBrush.Color = Color.FromRgb(0, 255, 128);
+                        visual.Opacity = 1;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Color = Color.FromRgb(0, 255, 128);
+                            tv.Shadow.BlurRadius = 30;
+                            tv.Shadow.Opacity = 0.9;
+                        }
+                        break;
 
-                case TileState.Missed:
-                    alphaBg = (byte)(180 * (1 - tile.AnimProgress));
-                    alphaBorder = (byte)(60 * (1 - tile.AnimProgress));
-                    tv.BgBrush.Color = Color.FromArgb(alphaBg, 255, 23, 68);
-                    tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 255, 23, 68);
-                    visual.Opacity = 1 - tile.AnimProgress;
-                    if (tv.Shadow != null)
-                    {
-                        tv.Shadow.Opacity = 0;
-                    }
-                    break;
+                    case TileState.HitPerfect:
+                        byte alphaBg = (byte)(255 * (1 - tile.AnimProgress));
+                        byte alphaBorder = (byte)(100 * (1 - tile.AnimProgress));
+                        tv.BgBrush.Color = Color.FromArgb(alphaBg, 0, 245, 255);
+                        tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 0, 245, 255);
+                        visual.Opacity = 1 - tile.AnimProgress;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Color = Color.FromRgb(0, 245, 255);
+                            tv.Shadow.BlurRadius = 30 + tile.AnimProgress * 20;
+                            tv.Shadow.Opacity = 0.8 * (1 - tile.AnimProgress);
+                        }
+                        break;
+
+                    case TileState.HitGood:
+                        alphaBg = (byte)(255 * (1 - tile.AnimProgress));
+                        alphaBorder = (byte)(80 * (1 - tile.AnimProgress));
+                        tv.BgBrush.Color = Color.FromArgb(alphaBg, 132, 94, 247);
+                        tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 132, 94, 247);
+                        visual.Opacity = 1 - tile.AnimProgress;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Color = Color.FromRgb(132, 94, 247);
+                            tv.Shadow.BlurRadius = 20 + tile.AnimProgress * 15;
+                            tv.Shadow.Opacity = 0.6 * (1 - tile.AnimProgress);
+                        }
+                        break;
+
+                    case TileState.Missed:
+                        alphaBg = (byte)(180 * (1 - tile.AnimProgress));
+                        alphaBorder = (byte)(60 * (1 - tile.AnimProgress));
+                        tv.BgBrush.Color = Color.FromArgb(alphaBg, 255, 23, 68);
+                        tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 255, 23, 68);
+                        visual.Opacity = 1 - tile.AnimProgress;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Opacity = 0;
+                        }
+                        break;
+                }
+            }
+            else
+            {
+                switch (tile.State)
+                {
+                    case TileState.Active:
+                        tv.BgBrush.Color = Color.FromRgb(18, 18, 28);
+                        tv.BorderBrush.Color = Color.FromArgb(60, laneColor.R, laneColor.G, laneColor.B);
+                        visual.Opacity = 1;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Color = laneColor;
+                            tv.Shadow.BlurRadius = 12;
+                            tv.Shadow.Opacity = 0.3;
+                        }
+
+                        // In Easy Mode, highlight the waiting tile
+                        if (_game.EasyMode && _game.IsWaitingForInput && tile.Lane == _game.WaitingLane
+                            && tile.YPosition >= PianoTilesGame.HitZoneY - 0.01)
+                        {
+                            tv.BorderBrush.Color = Color.FromArgb(150, laneColor.R, laneColor.G, laneColor.B);
+                            if (tv.Shadow != null)
+                            {
+                                tv.Shadow.BlurRadius = 25;
+                                tv.Shadow.Opacity = 0.7;
+                            }
+                        }
+                        break;
+
+                    case TileState.HitPerfect:
+                        byte alphaBg = (byte)(255 * (1 - tile.AnimProgress));
+                        byte alphaBorder = (byte)(100 * (1 - tile.AnimProgress));
+                        tv.BgBrush.Color = Color.FromArgb(alphaBg, 0, 245, 255);
+                        tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 0, 245, 255);
+                        visual.Opacity = 1 - tile.AnimProgress;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Color = Color.FromRgb(0, 245, 255);
+                            tv.Shadow.BlurRadius = 30 + tile.AnimProgress * 20;
+                            tv.Shadow.Opacity = 0.8 * (1 - tile.AnimProgress);
+                        }
+                        break;
+
+                    case TileState.HitGood:
+                        alphaBg = (byte)(255 * (1 - tile.AnimProgress));
+                        alphaBorder = (byte)(80 * (1 - tile.AnimProgress));
+                        tv.BgBrush.Color = Color.FromArgb(alphaBg, 132, 94, 247);
+                        tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 132, 94, 247);
+                        visual.Opacity = 1 - tile.AnimProgress;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Color = Color.FromRgb(132, 94, 247);
+                            tv.Shadow.BlurRadius = 20 + tile.AnimProgress * 15;
+                            tv.Shadow.Opacity = 0.6 * (1 - tile.AnimProgress);
+                        }
+                        break;
+
+                    case TileState.Missed:
+                        alphaBg = (byte)(180 * (1 - tile.AnimProgress));
+                        alphaBorder = (byte)(60 * (1 - tile.AnimProgress));
+                        tv.BgBrush.Color = Color.FromArgb(alphaBg, 255, 23, 68);
+                        tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 255, 23, 68);
+                        visual.Opacity = 1 - tile.AnimProgress;
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.Opacity = 0;
+                        }
+                        break;
+                }
             }
         }
     }
@@ -1266,6 +1439,7 @@ public partial class PianoTilesWindow : Window
         if (_touchInput != null)
         {
             _touchInput.TouchDown -= OnTouchDown;
+            _touchInput.TouchUp -= OnTouchUp;
         }
 
         _midi.AllNotesOff();
