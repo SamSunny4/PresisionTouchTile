@@ -1022,7 +1022,6 @@ public partial class PianoTilesWindow : Window
             visual.Visibility = Visibility.Visible;
 
             double x = tile.Lane * _laneWidth + 2;
-            double laneWidthMinusGap = _laneWidth - 4;
 
             if (tile.IsHoldNote)
             {
