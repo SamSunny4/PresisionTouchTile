@@ -57,6 +57,17 @@ public class PianoTilesGame
     /// <summary>The lane of the tile that is currently waiting for input in Easy Mode.</summary>
     public int WaitingLane { get; private set; } = -1;
 
+    // ─── Key Held State ───────────────────────────────────────────
+    private readonly bool[] _isLaneHeld = new bool[MaxLanes];
+
+    public void SetLaneHeld(int lane, bool isHeld)
+    {
+        if (lane >= 0 && lane < MaxLanes)
+        {
+            _isLaneHeld[lane] = isHeld;
+        }
+    }
+
     // ─── Scoring ───────────────────────────────────────────────────
     public int Score { get; private set; }
     public int Combo { get; private set; }
@@ -100,6 +111,7 @@ public class PianoTilesGame
         CurrentSong = song;
         _nextEventIndex = 0;
         ActiveTiles.Clear();
+        Array.Clear(_isLaneHeld, 0, _isLaneHeld.Length);
 
         Score = 0;
         Combo = 0;
@@ -184,7 +196,8 @@ public class PianoTilesGame
                         TargetTimeMs = evt.TimeMs,
                         MidiNote = evt.MidiNote,
                         State = TileState.Active,
-                        YPosition = 0
+                        YPosition = 0,
+                        DurationMs = evt.DurationMs
                     });
                     _nextEventIndex++;
                 }
@@ -232,6 +245,51 @@ public class PianoTilesGame
                             LastHitQuality = TileState.Missed;
                             LastHitTime = currentTime;
                             LastHitLane = tile.Lane;
+                        }
+                    }
+                }
+                else if (tile.State == TileState.Holding)
+                {
+                    // If player released the hold early:
+                    if (!_isLaneHeld[tile.Lane])
+                    {
+                        tile.State = TileState.Missed;
+                        tile.AnimProgress = 0;
+                        MissCount++;
+                        Combo = 0;
+                        OnComboChanged?.Invoke(Combo);
+                        OnTileMissed?.Invoke(tile);
+
+                        LastHitQuality = TileState.Missed;
+                        LastHitTime = currentTime;
+                        LastHitLane = tile.Lane;
+                    }
+                    else
+                    {
+                        // Check if the hold duration is complete
+                        if (currentTime >= tile.TargetTimeMs + tile.DurationMs)
+                        {
+                            tile.State = TileState.HitPerfect;
+                            tile.AnimProgress = 0;
+                            PerfectCount++;
+
+                            Combo++;
+                            if (Combo > MaxCombo) MaxCombo = Combo;
+                            OnComboChanged?.Invoke(Combo);
+
+                            double comboMultiplier = 1.0 + (Combo / 10.0) * 0.5;
+                            Score += (int)(150 * comboMultiplier); // 150 points for complete hold
+
+                            LastHitQuality = TileState.HitPerfect;
+                            LastHitTime = currentTime;
+                            LastHitLane = tile.Lane;
+
+                            OnTileHit?.Invoke(tile, TileState.HitPerfect);
+                        }
+                        else
+                        {
+                            // Ticking hold score points
+                            Score += 1;
                         }
                     }
                 }
@@ -287,30 +345,52 @@ public class PianoTilesGame
 
                 if (lane == waitingTile.Lane)
                 {
-                    // Correct lane — always Perfect in Easy Mode
-                    waitingTile.State = TileState.HitPerfect;
-                    waitingTile.AnimProgress = 0;
-                    PerfectCount++;
+                    if (waitingTile.IsHoldNote)
+                    {
+                        // Transition to Holding state
+                        waitingTile.State = TileState.Holding;
+                        waitingTile.AnimProgress = 0;
 
-                    Combo++;
-                    if (Combo > MaxCombo) MaxCombo = Combo;
-                    OnComboChanged?.Invoke(Combo);
+                        LastHitQuality = TileState.Holding;
+                        LastHitTime = _gameTimer.ElapsedMilliseconds;
+                        LastHitLane = lane;
 
-                    double comboMultiplier = 1.0 + (Combo / 10.0) * 0.5;
-                    Score += (int)(100 * comboMultiplier);
+                        OnTileHit?.Invoke(waitingTile, TileState.Holding);
 
-                    LastHitQuality = TileState.HitPerfect;
-                    LastHitTime = _gameTimer.ElapsedMilliseconds;
-                    LastHitLane = lane;
+                        // Resume the game so hold progresses
+                        IsWaitingForInput = false;
+                        WaitingLane = -1;
+                        _gameTimer.Start();
 
-                    OnTileHit?.Invoke(waitingTile, TileState.HitPerfect);
+                        return new HitResult(true, TileState.Holding, waitingTile);
+                    }
+                    else
+                    {
+                        // Correct lane — always Perfect in Easy Mode
+                        waitingTile.State = TileState.HitPerfect;
+                        waitingTile.AnimProgress = 0;
+                        PerfectCount++;
 
-                    // Resume the game
-                    IsWaitingForInput = false;
-                    WaitingLane = -1;
-                    _gameTimer.Start();
+                        Combo++;
+                        if (Combo > MaxCombo) MaxCombo = Combo;
+                        OnComboChanged?.Invoke(Combo);
 
-                    return new HitResult(true, TileState.HitPerfect, waitingTile);
+                        double comboMultiplier = 1.0 + (Combo / 10.0) * 0.5;
+                        Score += (int)(100 * comboMultiplier);
+
+                        LastHitQuality = TileState.HitPerfect;
+                        LastHitTime = _gameTimer.ElapsedMilliseconds;
+                        LastHitLane = lane;
+
+                        OnTileHit?.Invoke(waitingTile, TileState.HitPerfect);
+
+                        // Resume the game
+                        IsWaitingForInput = false;
+                        WaitingLane = -1;
+                        _gameTimer.Start();
+
+                        return new HitResult(true, TileState.HitPerfect, waitingTile);
+                    }
                 }
                 else
                 {
@@ -348,6 +428,21 @@ public class PianoTilesGame
                 // Wrong tap — no tile in this lane near the hit zone
                 ApplyWrongHitPenalty(lane);
                 return new HitResult(false, TileState.Missed, null);
+            }
+
+            if (bestTile.IsHoldNote)
+            {
+                // Start holding the note
+                bestTile.State = TileState.Holding;
+                bestTile.AnimProgress = 0;
+
+                LastHitQuality = TileState.Holding;
+                LastHitTime = currentTime;
+                LastHitLane = lane;
+
+                OnTileHit?.Invoke(bestTile, TileState.Holding);
+
+                return new HitResult(true, TileState.Holding, bestTile);
             }
 
             // Determine hit quality

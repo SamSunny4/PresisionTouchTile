@@ -3,7 +3,7 @@ namespace TouchpadVisualizer.Game;
 /// <summary>
 /// A single note event in a song pattern — defines when a tile appears, in which lane, and what note to play.
 /// </summary>
-public record TileEvent(double TimeMs, int Lane, byte MidiNote);
+public record TileEvent(double TimeMs, int Lane, byte MidiNote, double DurationMs = 0);
 
 /// <summary>
 /// Defines a complete song as a sequence of tile events with metadata.
@@ -40,7 +40,7 @@ public class SongPattern
             double normalizedPos = (evt.Lane + 0.5) / OriginalLaneCount;
             int newLane = (int)(normalizedPos * targetLaneCount);
             newLane = Math.Clamp(newLane, 0, targetLaneCount - 1);
-            remapped.Add(new TileEvent(evt.TimeMs, newLane, evt.MidiNote));
+            remapped.Add(new TileEvent(evt.TimeMs, newLane, evt.MidiNote, evt.DurationMs));
         }
 
         return new SongPattern
@@ -62,6 +62,9 @@ public class SongPattern
         CanonInD(),
         FurElise(),
         MoonlightSonataTheme(),
+        InterstellarTheme(),
+        PiratesTheme(),
+        AvengersTheme(),
     ];
 
     // ─── Helper ─────────────────────────────────────────────────────
@@ -517,6 +520,200 @@ public class SongPattern
         {
             Name = "Moonlight Sonata",
             Artist = "Beethoven",
+            Bpm = bpm,
+            Difficulty = "Hard",
+            Events = events
+        };
+    }
+
+    // ─── SONG 6: Interstellar Theme (Cornfield Chase) ──────────────
+
+    public static SongPattern InterstellarTheme()
+    {
+        const int bpm = 96;
+        var events = new List<TileEvent>();
+        double t = 0;
+        double beat = 60000.0 / bpm; // 625 ms per beat
+
+        // Cornfield Chase main theme in 3/4 time
+        // Each bar has 3 beats:
+        // A4 (0), C5 (2), E5 (3, hold)
+        // B4 (1), D5 (1), E5 (3, hold)
+        // C5 (2), E5 (3), A5 (3, hold)
+        // B4 (1), D5 (1), E5 (3, hold)
+
+        void AddInterstellarBar(ref double time, byte n1, int lane1, byte n2, int lane2, byte n3, int lane3, double holdBeats)
+        {
+            events.Add(new TileEvent(time, lane1, n1)); time += beat;
+            events.Add(new TileEvent(time, lane2, n2)); time += beat;
+            events.Add(new TileEvent(time, lane3, n3, holdBeats * beat)); time += holdBeats * beat;
+        }
+
+        // Loop the theme a few times with variations
+        for (int i = 0; i < 3; i++)
+        {
+            // Bar 1: A4, C5, E5 (hold 2 beats)
+            AddInterstellarBar(ref t, 69, 0, 72, 2, 76, 3, 2);
+            // Bar 2: B4, D5, E5 (hold 2 beats)
+            AddInterstellarBar(ref t, 71, 1, 74, 1, 76, 3, 2);
+            // Bar 3: C5, E5, A5 (hold 2 beats)
+            AddInterstellarBar(ref t, 72, 2, 76, 3, 81, 0, 2);
+            // Bar 4: B4, D5, E5 (hold 2 beats)
+            AddInterstellarBar(ref t, 71, 1, 74, 1, 76, 3, 2);
+        }
+
+        // B-Section climax
+        // G4, B4, D5 (hold), A4, C5, E5 (hold)
+        for (int i = 0; i < 2; i++)
+        {
+            AddInterstellarBar(ref t, 67, 0, 71, 1, 74, 2, 2);
+            AddInterstellarBar(ref t, 69, 1, 72, 2, 76, 3, 2);
+            AddInterstellarBar(ref t, 71, 2, 74, 1, 79, 3, 2); // G5 hold
+            AddInterstellarBar(ref t, 72, 3, 76, 3, 81, 0, 4); // A5 super hold
+        }
+
+        return new SongPattern
+        {
+            Name = "Cornfield Chase",
+            Artist = "Hans Zimmer (Interstellar)",
+            Bpm = bpm,
+            Difficulty = "Medium",
+            Events = events
+        };
+    }
+
+    // ─── SONG 7: Pirates of the Caribbean (He's a Pirate) ─────────
+
+    public static SongPattern PiratesTheme()
+    {
+        const int bpm = 140;
+        var events = new List<TileEvent>();
+        double t = 0;
+        double beat = 30000.0 / bpm; // eighth note = 214 ms
+
+        // Fast 3/4 or 6/8 feel
+        // Intro: 8 fast taps on D4
+        for (int i = 0; i < 8; i++)
+        {
+            events.Add(new TileEvent(t, 1, 62)); t += beat;
+        }
+        t += beat * 2; // brief pause
+
+        // Main theme loop
+        void AddPiratesPhrase(ref double time)
+        {
+            // A3, C4, D4, D4, D4, E4, F4, F4, F4, G4, E4, E4, D4, C4, C4, D4 (hold)
+            events.Add(new TileEvent(time, 0, 57)); time += beat;
+            events.Add(new TileEvent(time, 2, 60)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat * 2; // longer
+            events.Add(new TileEvent(time, 3, 64)); time += beat;
+            events.Add(new TileEvent(time, 1, 65)); time += beat;
+            events.Add(new TileEvent(time, 1, 65)); time += beat;
+            events.Add(new TileEvent(time, 1, 65)); time += beat * 2;
+            events.Add(new TileEvent(time, 2, 67)); time += beat;
+            events.Add(new TileEvent(time, 3, 64)); time += beat;
+            events.Add(new TileEvent(time, 3, 64)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat;
+            events.Add(new TileEvent(time, 2, 60)); time += beat;
+            events.Add(new TileEvent(time, 2, 60)); time += beat;
+            // End on D4 hold note
+            events.Add(new TileEvent(time, 1, 62, beat * 4)); time += beat * 5;
+        }
+
+        void AddPiratesPhrase2(ref double time)
+        {
+            // A3, C4, D4, D4, D4, F4, G4, G4, G4, A4, A4#, A4#, A4, G4, A4, D4 (hold)
+            events.Add(new TileEvent(time, 0, 57)); time += beat;
+            events.Add(new TileEvent(time, 2, 60)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat;
+            events.Add(new TileEvent(time, 1, 62)); time += beat * 2;
+            events.Add(new TileEvent(time, 1, 65)); time += beat;
+            events.Add(new TileEvent(time, 2, 67)); time += beat;
+            events.Add(new TileEvent(time, 2, 67)); time += beat;
+            events.Add(new TileEvent(time, 2, 67)); time += beat * 2;
+            events.Add(new TileEvent(time, 0, 69)); time += beat;
+            events.Add(new TileEvent(time, 3, 70)); time += beat; // A#4 / Bb4
+            events.Add(new TileEvent(time, 3, 70)); time += beat;
+            events.Add(new TileEvent(time, 0, 69)); time += beat;
+            events.Add(new TileEvent(time, 2, 67)); time += beat;
+            events.Add(new TileEvent(time, 0, 69)); time += beat;
+            // End on D4 hold note
+            events.Add(new TileEvent(time, 1, 62, beat * 6)); time += beat * 7;
+        }
+
+        AddPiratesPhrase(ref t);
+        AddPiratesPhrase2(ref t);
+
+        return new SongPattern
+        {
+            Name = "He's a Pirate",
+            Artist = "Klaus Badelt (Pirates of the Caribbean)",
+            Bpm = bpm,
+            Difficulty = "Hard",
+            Events = events
+        };
+    }
+
+    // ─── SONG 8: Marvel Avengers Theme ────────────────────────────
+
+    public static SongPattern AvengersTheme()
+    {
+        const int bpm = 112;
+        var events = new List<TileEvent>();
+        double t = 0;
+        double beat = 60000.0 / bpm; // 536 ms per beat
+
+        // Avengers main heroic motif
+        // A3 A3 A3, E4 (hold), D4 (hold)
+        // G3, D4, C4, A#3, C4, D4, G3
+        void AddAvengersMainMotif(ref double time)
+        {
+            // Three fast taps
+            events.Add(new TileEvent(time, 0, 57)); time += beat * 0.5;
+            events.Add(new TileEvent(time, 0, 57)); time += beat * 0.5;
+            events.Add(new TileEvent(time, 0, 57)); time += beat;
+
+            // E4 hold note
+            events.Add(new TileEvent(time, 2, 64, beat * 2.5)); time += beat * 3;
+
+            // D4 hold note
+            events.Add(new TileEvent(time, 1, 62, beat * 2.5)); time += beat * 3.5;
+
+            // Bridge part
+            events.Add(new TileEvent(time, 3, 55)); time += beat; // G3
+            events.Add(new TileEvent(time, 1, 62)); time += beat; // D4
+            events.Add(new TileEvent(time, 2, 60)); time += beat; // C4
+            events.Add(new TileEvent(time, 0, 58)); time += beat; // A#3
+            events.Add(new TileEvent(time, 2, 60)); time += beat; // C4
+            events.Add(new TileEvent(time, 1, 62)); time += beat; // D4
+            events.Add(new TileEvent(time, 3, 55, beat * 2)); time += beat * 3; // G3 hold
+        }
+
+        AddAvengersMainMotif(ref t);
+        
+        // Repetition with higher pitch climax (A4, E5, D5)
+        events.Add(new TileEvent(t, 0, 69)); t += beat * 0.5;
+        events.Add(new TileEvent(t, 0, 69)); t += beat * 0.5;
+        events.Add(new TileEvent(t, 0, 69)); t += beat;
+        events.Add(new TileEvent(t, 3, 76, beat * 2.5)); t += beat * 3; // E5 hold
+        events.Add(new TileEvent(t, 1, 74, beat * 2.5)); t += beat * 3.5; // D5 hold
+
+        // Outro bridge
+        events.Add(new TileEvent(t, 3, 55)); t += beat; // G3
+        events.Add(new TileEvent(t, 1, 62)); t += beat; // D4
+        events.Add(new TileEvent(t, 2, 60)); t += beat; // C4
+        events.Add(new TileEvent(t, 0, 58)); t += beat; // A#3
+        events.Add(new TileEvent(t, 2, 60)); t += beat; // C4
+        events.Add(new TileEvent(t, 1, 62)); t += beat; // D4
+        events.Add(new TileEvent(t, 0, 69, beat * 4)); t += beat * 5; // A4 super hold
+
+        return new SongPattern
+        {
+            Name = "The Avengers Theme",
+            Artist = "Alan Silvestri (Marvel)",
             Bpm = bpm,
             Difficulty = "Hard",
             Events = events

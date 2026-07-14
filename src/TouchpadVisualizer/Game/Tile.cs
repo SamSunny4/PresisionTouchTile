@@ -13,6 +13,8 @@ public enum TileState
     HitGood,
     /// <summary>Tile passed the hit zone without being tapped.</summary>
     Missed,
+    /// <summary>Tile is currently being held correctly.</summary>
+    Holding,
 }
 
 /// <summary>
@@ -42,6 +44,12 @@ public class Tile
     /// <summary>Animation progress for hit/miss effects (0.0 to 1.0).</summary>
     public double AnimProgress { get; set; }
 
+    /// <summary>Duration of the hold note in milliseconds (0 for normal tap tiles).</summary>
+    public double DurationMs { get; set; }
+
+    /// <summary>Whether this is a hold tile.</summary>
+    public bool IsHoldNote => DurationMs > 0;
+
     /// <summary>Whether this tile has been processed (hit or missed) and can be removed.</summary>
-    public bool IsFinished => State != TileState.Active && AnimProgress >= 1.0;
+    public bool IsFinished => State != TileState.Active && State != TileState.Holding && AnimProgress >= 1.0;
 }
