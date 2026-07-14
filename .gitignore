@@ -1,0 +1,49 @@
+## Ignore Visual Studio temp files, build results, and user settings
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio cache and settings
+.vs/
+[Dd]ebug/
+[Dd]ebugPS/
+[Rr]elease/
+[Rr]eleasePS/
+x64/
+x86/
+[Aa]rm/
+[Aa]rm64/
+bld/
+[Bb]in/
+[Oo]bj/
+Log/
+Logs/
+
+# Rider IDE
+.idea/
+
+# Visual Studio Code
+.vscode/
+
+# .NET Core/CoreCLR/NETSDK
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Backup and temporary files
+*~
+*.tmp
+*.bak
+*.swp
+
+# Log files
+*.log
+debug.log
+
+# User local settings files
+C:\Users\samsu\.gemini\antigravity-ide\
+settings.json
