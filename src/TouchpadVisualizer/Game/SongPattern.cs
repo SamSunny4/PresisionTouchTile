@@ -20,6 +20,40 @@ public class SongPattern
     /// <summary>Duration of the song in milliseconds.</summary>
     public double DurationMs => Events.Count > 0 ? Events[^1].TimeMs + 2000 : 0;
 
+    /// <summary>The lane count this song was composed for (default 4).</summary>
+    public int OriginalLaneCount { get; init; } = 4;
+
+    /// <summary>
+    /// Returns a new SongPattern with all lane assignments remapped to fit the target lane count.
+    /// Notes are spread proportionally based on their original lane positions.
+    /// </summary>
+    public SongPattern RemapToLanes(int targetLaneCount)
+    {
+        if (targetLaneCount == OriginalLaneCount)
+            return this;
+
+        var remapped = new List<TileEvent>(Events.Count);
+        foreach (var evt in Events)
+        {
+            // Map from [0, OriginalLaneCount) to [0, targetLaneCount)
+            // Use proportional mapping: preserve relative position
+            double normalizedPos = (evt.Lane + 0.5) / OriginalLaneCount;
+            int newLane = (int)(normalizedPos * targetLaneCount);
+            newLane = Math.Clamp(newLane, 0, targetLaneCount - 1);
+            remapped.Add(new TileEvent(evt.TimeMs, newLane, evt.MidiNote));
+        }
+
+        return new SongPattern
+        {
+            Name = Name,
+            Artist = Artist,
+            Bpm = Bpm,
+            Difficulty = Difficulty,
+            Events = remapped,
+            OriginalLaneCount = OriginalLaneCount,
+        };
+    }
+
     /// <summary>Returns all available pre-composed songs.</summary>
     public static List<SongPattern> GetAllSongs() =>
     [

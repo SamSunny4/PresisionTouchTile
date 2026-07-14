@@ -483,12 +483,26 @@ public partial class MainWindow : Window
     private void LaunchPianoTiles()
     {
         _isGameRunning = true;
-        var gameWindow = new PianoTilesWindow(_touchpadInput)
+
+        // Ensure cursor is shown before showing the game window
+        if (_cursorHidden)
         {
-            Owner = this
+            ShowCursor(true);
+            Cursor = Cursors.Arrow;
+            _cursorHidden = false;
+        }
+
+        // Hide the main window so only the game window shows in taskbar/alt-tab
+        this.Hide();
+
+        var gameWindow = new PianoTilesWindow(_touchpadInput);
+        gameWindow.Closed += (_, _) =>
+        {
+            _isGameRunning = false;
+            this.Show();
+            this.Activate();
         };
-        gameWindow.ShowDialog();
-        _isGameRunning = false;
+        gameWindow.Show();
     }
 
     private void ToggleSettings()
@@ -537,7 +551,7 @@ public partial class MainWindow : Window
 
     private void CursorTimer_Tick(object? sender, EventArgs e)
     {
-        if (_settingsVisible) return; // Don't hide cursor when settings are open
+        if (_settingsVisible || _isGameRunning) return; // Don't hide cursor when settings or game are open
 
         var elapsed = DateTime.Now - _lastMouseMove;
         if (elapsed.TotalSeconds >= 3 && !_cursorHidden)

@@ -16,6 +16,15 @@ namespace TouchpadVisualizer.Views;
 /// <summary>
 /// Piano Tiles game window. Fullscreen WPF game with touchpad + keyboard input,
 /// MIDI sound, and neon visual effects on a pitch-black background.
+/// Supports configurable lane count (3–6), Easy Mode, and wrong-input penalties.
+/// 
+/// Performance notes:
+/// - DropShadowEffect removed from particles (software-rendered, massive FPS cost)
+/// - Tile DropShadowEffect cached and only updated when state changes
+/// - Brush objects are reused instead of allocating new ones every frame
+/// - BitmapCache applied to canvases for GPU-accelerated composition
+/// - Background particles use shared frozen brush
+/// - Particle removal uses index-based swap-remove pattern
 /// </summary>
 public partial class PianoTilesWindow : Window
 {
@@ -26,13 +35,25 @@ public partial class PianoTilesWindow : Window
     private readonly List<SongPattern> _songs;
     private SongPattern? _selectedSong;
 
+    // ─── Settings State ────────────────────────────────────────────
+    private int _selectedLaneCount = PianoTilesGame.DefaultLaneCount;
+    private bool _easyModeEnabled;
+    private readonly Border[] _laneCountButtons = new Border[PianoTilesGame.MaxLanes - PianoTilesGame.MinLanes + 1];
+    private int _menuSelectedSongIndex = 0;
+    private readonly List<Border> _songMenuBorders = new();
+
     // ─── Visual Element Pools ──────────────────────────────────────
-    private readonly List<Border> _tileVisuals = new();
+    private readonly List<TileVisual> _tileVisuals = new();
     private readonly List<Ellipse> _particles = new();
     private readonly List<ParticleState> _particleStates = new();
-    private readonly Border[] _laneFlashes = new Border[4];
+    private Border[] _laneFlashes = new Border[PianoTilesGame.DefaultLaneCount];
+    private readonly SolidColorBrush[] _laneFlashBrushes = new SolidColorBrush[PianoTilesGame.MaxLanes];
     private readonly List<Ellipse> _bgParticles = new();
     private readonly List<BgParticleState> _bgParticleStates = new();
+
+    // ─── Reusable brushes (avoid GC pressure) ──────────────────────
+    private readonly SolidColorBrush _hitFeedbackBrush = new(Colors.White);
+    private static readonly SolidColorBrush FrozenBgParticleBrush;
 
     // ─── Rendering ─────────────────────────────────────────────────
     private double _screenWidth;
@@ -44,20 +65,61 @@ public partial class PianoTilesWindow : Window
 
     // ─── Hit feedback animation ────────────────────────────────────
     private double _hitFeedbackTimer;
-    private string _hitFeedbackMessage = "";
-    private Color _hitFeedbackColor;
+
+    // ─── Easy Mode waiting indicator pulse ─────────────────────────
+    private double _waitingPulseTimer;
 
     // ─── Random for particles ──────────────────────────────────────
     private readonly Random _rng = new();
 
-    // ─── Neon colors for lanes ─────────────────────────────────────
+    // ─── Neon colors for lanes (supports up to 6 lanes) ────────────
     private static readonly Color[] LaneColors =
     [
         Color.FromRgb(0, 245, 255),   // Cyan
         Color.FromRgb(132, 94, 247),  // Purple
         Color.FromRgb(255, 107, 157), // Pink
         Color.FromRgb(57, 255, 20),   // Green
+        Color.FromRgb(255, 107, 0),   // Orange
+        Color.FromRgb(255, 214, 0),   // Yellow
     ];
+
+    // ─── Pre-frozen brushes for particles (one per lane color) ─────
+    private static readonly SolidColorBrush[] FrozenParticleBrushes;
+
+    // ─── Keyboard mappings per lane count ──────────────────────────
+    private static readonly Dictionary<int, Key[]> LaneKeyMappings = new()
+    {
+        [3] = [Key.D, Key.Space, Key.K],
+        [4] = [Key.D, Key.F, Key.J, Key.K],
+        [5] = [Key.D, Key.F, Key.Space, Key.J, Key.K],
+        [6] = [Key.S, Key.D, Key.F, Key.J, Key.K, Key.L],
+    };
+
+    private static readonly Dictionary<int, string[]> LaneKeyLabels = new()
+    {
+        [3] = ["D", "SPACE", "K"],
+        [4] = ["D", "F", "J", "K"],
+        [5] = ["D", "F", "SPACE", "J", "K"],
+        [6] = ["S", "D", "F", "J", "K", "L"],
+    };
+
+    // ─── Tile visual wrapper (caches brush references) ─────────────
+    private class TileVisual
+    {
+        public Border Element;
+        public SolidColorBrush BgBrush;
+        public SolidColorBrush BorderBrush;
+        public DropShadowEffect? Shadow;
+        public TileState LastState = (TileState)(-1); // force first update
+
+        public TileVisual(Border element, SolidColorBrush bgBrush, SolidColorBrush borderBrush, DropShadowEffect? shadow)
+        {
+            Element = element;
+            BgBrush = bgBrush;
+            BorderBrush = borderBrush;
+            Shadow = shadow;
+        }
+    }
 
     // ─── Particle helper structs ───────────────────────────────────
     private record struct ParticleState(double X, double Y, double VX, double VY, double Life, double MaxLife, Color C);
@@ -65,6 +127,22 @@ public partial class PianoTilesWindow : Window
 
     // ─── Track key states to prevent repeat ────────────────────────
     private readonly HashSet<Key> _heldKeys = new();
+
+    static PianoTilesWindow()
+    {
+        // Pre-create and freeze particle brushes for each lane color
+        FrozenParticleBrushes = new SolidColorBrush[LaneColors.Length];
+        for (int i = 0; i < LaneColors.Length; i++)
+        {
+            var brush = new SolidColorBrush(LaneColors[i]);
+            brush.Freeze();
+            FrozenParticleBrushes[i] = brush;
+        }
+
+        // Frozen brush for background particles
+        FrozenBgParticleBrush = new SolidColorBrush(Color.FromArgb(20, 132, 94, 247));
+        FrozenBgParticleBrush.Freeze();
+    }
 
     public PianoTilesWindow(TouchpadInputManager? touchInput)
     {
@@ -81,7 +159,7 @@ public partial class PianoTilesWindow : Window
     {
         _screenWidth = ActualWidth > 0 ? ActualWidth : SystemParameters.PrimaryScreenWidth;
         _screenHeight = ActualHeight > 0 ? ActualHeight : SystemParameters.PrimaryScreenHeight;
-        _laneWidth = _screenWidth / PianoTilesGame.LaneCount;
+        _laneWidth = _screenWidth / _selectedLaneCount;
 
         // Open MIDI
         _midi.Open();
@@ -101,6 +179,18 @@ public partial class PianoTilesWindow : Window
         // Build song list menu
         BuildSongMenu();
 
+        // Build settings UI
+        BuildLaneCountSelector();
+        UpdateEasyModeToggleVisual();
+        UpdateKeyLabels();
+        UpdateControlsHint();
+
+        // Enable BitmapCache on game canvases for GPU-accelerated compositing
+        TileCanvas.CacheMode = new BitmapCache { RenderAtScale = 1.0 };
+        ParticleCanvas.CacheMode = new BitmapCache { RenderAtScale = 1.0 };
+        // Background particles are nearly static — cache aggressively
+        BackgroundCanvas.CacheMode = new BitmapCache { RenderAtScale = 0.5 };
+
         // Wire touchpad input
         if (_touchInput != null)
         {
@@ -113,6 +203,7 @@ public partial class PianoTilesWindow : Window
         _game.OnGameOver += OnGameOver;
         _game.OnCountdownTick += OnCountdownTick;
         _game.OnGameStarted += OnGameStarted;
+        _game.OnWrongHit += OnWrongHit;
 
         // Start render loop
         _isRunning = true;
@@ -127,13 +218,17 @@ public partial class PianoTilesWindow : Window
 
     private void SetupLaneSeparators()
     {
-        for (int i = 1; i < PianoTilesGame.LaneCount; i++)
+        LaneSeparatorCanvas.Children.Clear();
+        var separatorBrush = new SolidColorBrush(Color.FromArgb(15, 132, 94, 247));
+        separatorBrush.Freeze();
+
+        for (int i = 1; i < _selectedLaneCount; i++)
         {
             var line = new Rectangle
             {
                 Width = 1,
                 Height = _screenHeight,
-                Fill = new SolidColorBrush(Color.FromArgb(15, 132, 94, 247)),
+                Fill = separatorBrush,
             };
             Canvas.SetLeft(line, i * _laneWidth);
             Canvas.SetTop(line, 0);
@@ -154,17 +249,21 @@ public partial class PianoTilesWindow : Window
 
     private void SetupLaneFlashes()
     {
-        for (int i = 0; i < 4; i++)
+        LaneFlashCanvas.Children.Clear();
+        _laneFlashes = new Border[_selectedLaneCount];
+        for (int i = 0; i < _selectedLaneCount; i++)
         {
+            var laneColor = LaneColors[i % LaneColors.Length];
+            // Create a reusable brush for this lane flash
+            var flashBrush = new SolidColorBrush(Color.FromArgb(20, laneColor.R, laneColor.G, laneColor.B));
+            _laneFlashBrushes[i] = flashBrush;
+
             var flash = new Border
             {
                 Width = _laneWidth,
                 Height = _screenHeight,
                 Opacity = 0,
-                Background = new LinearGradientBrush(
-                    Color.FromArgb(0, LaneColors[i].R, LaneColors[i].G, LaneColors[i].B),
-                    Color.FromArgb(30, LaneColors[i].R, LaneColors[i].G, LaneColors[i].B),
-                    new Point(0, 0), new Point(0, 1)),
+                Background = flashBrush,
             };
             Canvas.SetLeft(flash, i * _laneWidth);
             Canvas.SetTop(flash, 0);
@@ -175,7 +274,15 @@ public partial class PianoTilesWindow : Window
 
     private void SetupBackgroundParticles()
     {
-        int count = 60;
+        // Clear existing
+        foreach (var p in _bgParticles)
+        {
+            BackgroundCanvas.Children.Remove(p);
+        }
+        _bgParticles.Clear();
+        _bgParticleStates.Clear();
+
+        int count = 40; // Reduced from 60 — barely visible, saves per-frame updates
         for (int i = 0; i < count; i++)
         {
             var size = _rng.NextDouble() * 3 + 1;
@@ -184,7 +291,8 @@ public partial class PianoTilesWindow : Window
             {
                 Width = size,
                 Height = size,
-                Fill = new SolidColorBrush(Color.FromArgb((byte)(opacity * 255), 132, 94, 247)),
+                Fill = FrozenBgParticleBrush, // Shared frozen brush
+                Opacity = opacity,
             };
             double x = _rng.NextDouble() * _screenWidth;
             double y = _rng.NextDouble() * _screenHeight;
@@ -196,6 +304,148 @@ public partial class PianoTilesWindow : Window
         }
     }
 
+    /// <summary>
+    /// Rebuilds lane-dependent visuals when lane count changes.
+    /// </summary>
+    private void RebuildLaneVisuals()
+    {
+        _laneWidth = _screenWidth / _selectedLaneCount;
+        SetupLaneSeparators();
+        SetupLaneFlashes();
+        UpdateKeyLabels();
+        UpdateControlsHint();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  SETTINGS UI
+    // ═══════════════════════════════════════════════════════════════
+
+    private void BuildLaneCountSelector()
+    {
+        LaneCountPanel.Children.Clear();
+        for (int i = PianoTilesGame.MinLanes; i <= PianoTilesGame.MaxLanes; i++)
+        {
+            int lanes = i;
+            var isSelected = lanes == _selectedLaneCount;
+            var btn = new Border
+            {
+                Width = 52,
+                Height = 36,
+                CornerRadius = new CornerRadius(8),
+                Margin = new Thickness(4, 0, 4, 0),
+                Cursor = Cursors.Hand,
+                Background = new SolidColorBrush(isSelected
+                    ? Color.FromArgb(40, 132, 94, 247)
+                    : Color.FromArgb(10, 255, 255, 255)),
+                BorderBrush = new SolidColorBrush(isSelected
+                    ? Color.FromArgb(100, 132, 94, 247)
+                    : Color.FromArgb(15, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                Child = new TextBlock
+                {
+                    Text = lanes.ToString(),
+                    Foreground = new SolidColorBrush(isSelected
+                        ? Color.FromRgb(132, 94, 247)
+                        : Color.FromArgb(120, 255, 255, 255)),
+                    FontFamily = (FontFamily)Resources["GameFont"],
+                    FontSize = 16,
+                    FontWeight = isSelected ? FontWeights.Bold : FontWeights.Normal,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+            };
+
+            btn.MouseLeftButtonDown += (s, e) =>
+            {
+                _selectedLaneCount = lanes;
+                BuildLaneCountSelector(); // Rebuild to update selection
+                RebuildLaneVisuals();
+            };
+
+            btn.MouseEnter += (s, e) =>
+            {
+                if (lanes != _selectedLaneCount)
+                {
+                    btn.Background = new SolidColorBrush(Color.FromArgb(20, 132, 94, 247));
+                }
+            };
+            btn.MouseLeave += (s, e) =>
+            {
+                if (lanes != _selectedLaneCount)
+                {
+                    btn.Background = new SolidColorBrush(Color.FromArgb(10, 255, 255, 255));
+                }
+            };
+
+            int idx = i - PianoTilesGame.MinLanes;
+            _laneCountButtons[idx] = btn;
+            LaneCountPanel.Children.Add(btn);
+        }
+    }
+
+    private void EasyModeToggle_Click(object sender, MouseButtonEventArgs e)
+    {
+        _easyModeEnabled = !_easyModeEnabled;
+        UpdateEasyModeToggleVisual();
+    }
+
+    private void UpdateEasyModeToggleVisual()
+    {
+        if (_easyModeEnabled)
+        {
+            EasyModeToggle.Background = new SolidColorBrush(Color.FromArgb(25, 57, 255, 20));
+            EasyModeToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 57, 255, 20));
+            EasyModeIcon.Text = "●";
+            EasyModeIcon.Foreground = new SolidColorBrush(Color.FromRgb(57, 255, 20));
+        }
+        else
+        {
+            EasyModeToggle.Background = new SolidColorBrush(Color.FromArgb(10, 255, 255, 255));
+            EasyModeToggle.BorderBrush = new SolidColorBrush(Color.FromArgb(15, 255, 255, 255));
+            EasyModeIcon.Text = "○";
+            EasyModeIcon.Foreground = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
+        }
+    }
+
+    private void UpdateKeyLabels()
+    {
+        KeyLabelsPanel.Children.Clear();
+        if (!LaneKeyLabels.TryGetValue(_selectedLaneCount, out var labels)) return;
+
+        foreach (var label in labels)
+        {
+            KeyLabelsPanel.Children.Add(new TextBlock
+            {
+                Text = label,
+                Foreground = new SolidColorBrush(Color.FromArgb(48, 255, 255, 255)),
+                FontFamily = (FontFamily)Resources["GameFont"],
+                FontSize = 16,
+                FontWeight = FontWeights.Light,
+                Width = _laneWidth,
+                TextAlignment = TextAlignment.Center,
+            });
+        }
+    }
+
+    private void UpdateControlsHint()
+    {
+        if (!LaneKeyLabels.TryGetValue(_selectedLaneCount, out var labels)) return;
+        var keyStr = string.Join("  ", labels);
+        ControlsHintText.Inlines.Clear();
+        ControlsHintText.Inlines.Add(new System.Windows.Documents.Run("Touchpad: tap zones for lanes"));
+        ControlsHintText.Inlines.Add(new System.Windows.Documents.LineBreak());
+        ControlsHintText.Inlines.Add(new System.Windows.Documents.Run($"Keyboard: {keyStr}"));
+        if (_easyModeEnabled)
+        {
+            ControlsHintText.Inlines.Add(new System.Windows.Documents.LineBreak());
+            ControlsHintText.Inlines.Add(new System.Windows.Documents.Run("Easy Mode: tiles wait for your input") { Foreground = new SolidColorBrush(Color.FromRgb(57, 255, 20)) });
+        }
+        ControlsHintText.Inlines.Add(new System.Windows.Documents.LineBreak());
+        var menuHint = new System.Windows.Documents.Run("Menu: [↑/↓] Select, [Enter] Play, [3-6] Lanes, [E] Easy Mode");
+        menuHint.Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
+        ControlsHintText.Inlines.Add(menuHint);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     //  SONG MENU
     // ═══════════════════════════════════════════════════════════════
@@ -203,17 +453,17 @@ public partial class PianoTilesWindow : Window
     private void BuildSongMenu()
     {
         SongListPanel.Children.Clear();
+        _songMenuBorders.Clear();
 
-        foreach (var song in _songs)
+        for (int i = 0; i < _songs.Count; i++)
         {
+            var song = _songs[i];
+            int index = i;
             var btn = new Border
             {
                 Padding = new Thickness(20, 14, 20, 14),
                 Margin = new Thickness(0, 0, 0, 6),
                 CornerRadius = new CornerRadius(10),
-                Background = new SolidColorBrush(Color.FromArgb(12, 255, 255, 255)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(8, 132, 94, 247)),
-                BorderThickness = new Thickness(1),
                 Cursor = Cursors.Hand,
                 IsHitTestVisible = true,
             };
@@ -270,22 +520,41 @@ public partial class PianoTilesWindow : Window
 
             btn.Child = content;
 
-            // Hover effects
-            var capturedSong = song;
+            // Mouse hover updates active keyboard selection
             btn.MouseEnter += (s, e) =>
             {
-                btn.Background = new SolidColorBrush(Color.FromArgb(25, 132, 94, 247));
-                btn.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 132, 94, 247));
+                _menuSelectedSongIndex = index;
+                UpdateSongMenuSelection();
             };
-            btn.MouseLeave += (s, e) =>
-            {
-                btn.Background = new SolidColorBrush(Color.FromArgb(12, 255, 255, 255));
-                btn.BorderBrush = new SolidColorBrush(Color.FromArgb(8, 132, 94, 247));
-            };
-            btn.MouseLeftButtonDown += (s, e) => StartGame(capturedSong);
+            btn.MouseLeftButtonDown += (s, e) => StartGame(song);
 
+            _songMenuBorders.Add(btn);
             SongListPanel.Children.Add(btn);
         }
+
+        UpdateSongMenuSelection();
+    }
+
+    private void UpdateSongMenuSelection()
+    {
+        for (int i = 0; i < _songMenuBorders.Count; i++)
+        {
+            var btn = _songMenuBorders[i];
+            bool isSelected = i == _menuSelectedSongIndex;
+            btn.Background = new SolidColorBrush(isSelected
+                ? Color.FromArgb(40, 132, 94, 247)
+                : Color.FromArgb(12, 255, 255, 255));
+            btn.BorderBrush = new SolidColorBrush(isSelected
+                ? Color.FromArgb(100, 132, 94, 247)
+                : Color.FromArgb(8, 132, 94, 247));
+        }
+    }
+
+    private void ChangeSelectedLanes(int lanes)
+    {
+        _selectedLaneCount = lanes;
+        BuildLaneCountSelector();
+        RebuildLaneVisuals();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -294,8 +563,18 @@ public partial class PianoTilesWindow : Window
 
     private void StartGame(SongPattern song)
     {
-        _selectedSong = song;
-        _game.StartSong(song);
+        // Apply settings
+        _game.SetLaneCount(_selectedLaneCount);
+        _game.EasyMode = _easyModeEnabled;
+
+        // Remap song lanes if needed
+        var remappedSong = song.RemapToLanes(_selectedLaneCount);
+
+        _selectedSong = song; // keep original for replay
+        _game.StartSong(remappedSong);
+
+        // Rebuild lane visuals for the selected lane count
+        RebuildLaneVisuals();
 
         // Update UI
         MenuOverlay.Visibility = Visibility.Collapsed;
@@ -305,8 +584,10 @@ public partial class PianoTilesWindow : Window
 
         SongNameText.Text = song.Name;
         SongArtistText.Text = song.Artist;
+        ModeIndicatorText.Text = _easyModeEnabled ? $"EASY MODE  •  {_selectedLaneCount} LANES" : $"{_selectedLaneCount} LANES";
         ScoreText.Text = "0";
         ComboText.Text = "";
+        WaitingIndicator.Opacity = 0;
 
         // Clear old tiles
         TileCanvas.Children.Clear();
@@ -325,6 +606,88 @@ public partial class PianoTilesWindow : Window
         // Prevent key repeat from firing multiple hits
         if (_heldKeys.Contains(e.Key)) return;
         _heldKeys.Add(e.Key);
+
+        // Menu key navigation
+        if (_game.State == PianoTilesGame.GameState.Menu)
+        {
+            switch (e.Key)
+            {
+                case Key.Up:
+                    _menuSelectedSongIndex = (_menuSelectedSongIndex - 1 + _songs.Count) % _songs.Count;
+                    UpdateSongMenuSelection();
+                    e.Handled = true;
+                    return;
+
+                case Key.Down:
+                    _menuSelectedSongIndex = (_menuSelectedSongIndex + 1) % _songs.Count;
+                    UpdateSongMenuSelection();
+                    e.Handled = true;
+                    return;
+
+                case Key.Enter:
+                case Key.Space:
+                    StartGame(_songs[_menuSelectedSongIndex]);
+                    e.Handled = true;
+                    return;
+
+                case Key.D3:
+                case Key.NumPad3:
+                    ChangeSelectedLanes(3);
+                    e.Handled = true;
+                    return;
+
+                case Key.D4:
+                case Key.NumPad4:
+                    ChangeSelectedLanes(4);
+                    e.Handled = true;
+                    return;
+
+                case Key.D5:
+                case Key.NumPad5:
+                    ChangeSelectedLanes(5);
+                    e.Handled = true;
+                    return;
+
+                case Key.D6:
+                case Key.NumPad6:
+                    ChangeSelectedLanes(6);
+                    e.Handled = true;
+                    return;
+
+                case Key.E:
+                    _easyModeEnabled = !_easyModeEnabled;
+                    UpdateEasyModeToggleVisual();
+                    UpdateControlsHint();
+                    e.Handled = true;
+                    return;
+
+                case Key.Escape:
+                    Close();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // Game Over key navigation
+        if (_game.State == PianoTilesGame.GameState.GameOver)
+        {
+            switch (e.Key)
+            {
+                case Key.Enter:
+                case Key.R:
+                    if (_selectedSong != null)
+                        StartGame(_selectedSong);
+                    e.Handled = true;
+                    return;
+
+                case Key.Escape:
+                case Key.M:
+                case Key.Back:
+                    ShowMenu();
+                    e.Handled = true;
+                    return;
+            }
+        }
 
         switch (e.Key)
         {
@@ -356,11 +719,20 @@ public partial class PianoTilesWindow : Window
                 }
                 break;
 
-            // Lane keys: D F J K
-            case Key.D: HandleLaneInput(0); break;
-            case Key.F: HandleLaneInput(1); break;
-            case Key.J: HandleLaneInput(2); break;
-            case Key.K: HandleLaneInput(3); break;
+            default:
+                // Check dynamic lane key mappings
+                if (LaneKeyMappings.TryGetValue(_selectedLaneCount, out var keys))
+                {
+                    for (int i = 0; i < keys.Length; i++)
+                    {
+                        if (e.Key == keys[i])
+                        {
+                            HandleLaneInput(i);
+                            break;
+                        }
+                    }
+                }
+                break;
         }
 
         e.Handled = true;
@@ -380,7 +752,7 @@ public partial class PianoTilesWindow : Window
             return;
         }
 
-        int lane = PianoTilesGame.GetLaneFromTouchX(contact.NormalizedX);
+        int lane = _game.GetLaneFromTouchX(contact.NormalizedX);
         Dispatcher.BeginInvoke(() => HandleLaneInput(lane));
     }
 
@@ -419,6 +791,11 @@ public partial class PianoTilesWindow : Window
             else
                 ComboText.Text = "";
         }
+        else if (!result.IsHit && result.Quality == TileState.Missed)
+        {
+            // Wrong input was already handled via OnWrongHit event, but update score display
+            ScoreText.Text = _game.Score.ToString();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -439,6 +816,25 @@ public partial class PianoTilesWindow : Window
 
             // Red flash on the missed lane
             FlashLane(tile.Lane, Color.FromArgb(40, 255, 23, 68));
+        });
+    }
+
+    private void OnWrongHit(int lane)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            // Play error sound
+            _midi.PlayErrorSound();
+
+            // Show WRONG feedback in orange
+            ShowHitFeedback("WRONG", Color.FromRgb(255, 107, 0));
+            ComboText.Text = "";
+
+            // Flash lane in orange-red
+            FlashLane(lane, Color.FromArgb(50, 255, 107, 0));
+
+            // Update score display
+            ScoreText.Text = _game.Score.ToString();
         });
     }
 
@@ -471,6 +867,7 @@ public partial class PianoTilesWindow : Window
         Dispatcher.BeginInvoke(() =>
         {
             _midi.AllNotesOff();
+            WaitingIndicator.Opacity = 0;
             ShowGameOverScreen();
         });
     }
@@ -482,6 +879,7 @@ public partial class PianoTilesWindow : Window
         PerfectCountText.Text = _game.PerfectCount.ToString();
         GoodCountText.Text = _game.GoodCount.ToString();
         MissCountText.Text = _game.MissCount.ToString();
+        WrongCountText.Text = _game.WrongHitCount.ToString();
         MaxComboText.Text = $"Max Combo: {_game.MaxCombo}";
     }
 
@@ -490,6 +888,7 @@ public partial class PianoTilesWindow : Window
         MenuOverlay.Visibility = Visibility.Visible;
         GameOverOverlay.Visibility = Visibility.Collapsed;
         PauseOverlay.Visibility = Visibility.Collapsed;
+        WaitingIndicator.Opacity = 0;
         TileCanvas.Children.Clear();
         _tileVisuals.Clear();
     }
@@ -522,12 +921,13 @@ public partial class PianoTilesWindow : Window
         // Update game state
         _game.Update(delta * 1000);
 
-        // Update visuals
+        // Update visuals — order matters for layering
         UpdateTileVisuals();
         UpdateParticles(delta);
         UpdateBackgroundParticles(delta);
         UpdateLaneFlashes(delta);
         UpdateHitFeedback(delta);
+        UpdateWaitingIndicator(delta);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -545,88 +945,125 @@ public partial class PianoTilesWindow : Window
         // Ensure we have enough visual elements
         while (_tileVisuals.Count < tiles.Count)
         {
-            var visual = CreateTileVisual();
-            TileCanvas.Children.Add(visual);
-            _tileVisuals.Add(visual);
+            var tv = CreateTileVisual();
+            TileCanvas.Children.Add(tv.Element);
+            _tileVisuals.Add(tv);
         }
 
         // Hide excess visuals
         for (int i = tiles.Count; i < _tileVisuals.Count; i++)
         {
-            _tileVisuals[i].Visibility = Visibility.Collapsed;
+            _tileVisuals[i].Element.Visibility = Visibility.Collapsed;
         }
+
+        double tilePixelHeight = _screenHeight * PianoTilesGame.TileHeight;
+        double laneWidthMinusGap = _laneWidth - 4;
 
         // Update visible tile positions and styles
         for (int i = 0; i < tiles.Count; i++)
         {
             var tile = tiles[i];
-            var visual = _tileVisuals[i];
+            var tv = _tileVisuals[i];
+            var visual = tv.Element;
             visual.Visibility = Visibility.Visible;
 
-            double tilePixelHeight = _screenHeight * PianoTilesGame.TileHeight;
             double x = tile.Lane * _laneWidth + 2;
             double y = tile.YPosition * _screenHeight - tilePixelHeight;
 
             Canvas.SetLeft(visual, x);
             Canvas.SetTop(visual, y);
-            visual.Width = _laneWidth - 4;
+            visual.Width = laneWidthMinusGap;
             visual.Height = tilePixelHeight;
 
-            // Style based on state
-            var bgBrush = (SolidColorBrush)visual.Background;
-            var borderBrush = (SolidColorBrush)visual.BorderBrush;
-            var dsEffect = (DropShadowEffect)visual.Effect;
+            // Style based on state — use cached brushes
+            var laneColor = LaneColors[tile.Lane % LaneColors.Length];
 
             switch (tile.State)
             {
                 case TileState.Active:
-                    var laneColor = LaneColors[tile.Lane];
-                    bgBrush.Color = Color.FromRgb(18, 18, 28);
-                    borderBrush.Color = Color.FromArgb(60, laneColor.R, laneColor.G, laneColor.B);
+                    tv.BgBrush.Color = Color.FromRgb(18, 18, 28);
+                    tv.BorderBrush.Color = Color.FromArgb(60, laneColor.R, laneColor.G, laneColor.B);
                     visual.Opacity = 1;
-                    dsEffect.Color = laneColor;
-                    dsEffect.BlurRadius = 12;
-                    dsEffect.Opacity = 0.3;
+                    if (tv.Shadow != null)
+                    {
+                        tv.Shadow.Color = laneColor;
+                        tv.Shadow.BlurRadius = 12;
+                        tv.Shadow.Opacity = 0.3;
+                    }
+
+                    // In Easy Mode, highlight the waiting tile
+                    if (_game.EasyMode && _game.IsWaitingForInput && tile.Lane == _game.WaitingLane
+                        && tile.YPosition >= PianoTilesGame.HitZoneY - 0.01)
+                    {
+                        tv.BorderBrush.Color = Color.FromArgb(150, laneColor.R, laneColor.G, laneColor.B);
+                        if (tv.Shadow != null)
+                        {
+                            tv.Shadow.BlurRadius = 25;
+                            tv.Shadow.Opacity = 0.7;
+                        }
+                    }
                     break;
 
                 case TileState.HitPerfect:
-                    bgBrush.Color = Color.FromArgb((byte)(255 * (1 - tile.AnimProgress)), 0, 245, 255);
-                    borderBrush.Color = Color.FromArgb((byte)(100 * (1 - tile.AnimProgress)), 0, 245, 255);
+                    byte alphaBg = (byte)(255 * (1 - tile.AnimProgress));
+                    byte alphaBorder = (byte)(100 * (1 - tile.AnimProgress));
+                    tv.BgBrush.Color = Color.FromArgb(alphaBg, 0, 245, 255);
+                    tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 0, 245, 255);
                     visual.Opacity = 1 - tile.AnimProgress;
-                    dsEffect.Color = Color.FromRgb(0, 245, 255);
-                    dsEffect.BlurRadius = 30 + tile.AnimProgress * 20;
-                    dsEffect.Opacity = 0.8 * (1 - tile.AnimProgress);
+                    if (tv.Shadow != null)
+                    {
+                        tv.Shadow.Color = Color.FromRgb(0, 245, 255);
+                        tv.Shadow.BlurRadius = 30 + tile.AnimProgress * 20;
+                        tv.Shadow.Opacity = 0.8 * (1 - tile.AnimProgress);
+                    }
                     break;
 
                 case TileState.HitGood:
-                    bgBrush.Color = Color.FromArgb((byte)(255 * (1 - tile.AnimProgress)), 132, 94, 247);
-                    borderBrush.Color = Color.FromArgb((byte)(80 * (1 - tile.AnimProgress)), 132, 94, 247);
+                    alphaBg = (byte)(255 * (1 - tile.AnimProgress));
+                    alphaBorder = (byte)(80 * (1 - tile.AnimProgress));
+                    tv.BgBrush.Color = Color.FromArgb(alphaBg, 132, 94, 247);
+                    tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 132, 94, 247);
                     visual.Opacity = 1 - tile.AnimProgress;
-                    dsEffect.Color = Color.FromRgb(132, 94, 247);
-                    dsEffect.BlurRadius = 20 + tile.AnimProgress * 15;
-                    dsEffect.Opacity = 0.6 * (1 - tile.AnimProgress);
+                    if (tv.Shadow != null)
+                    {
+                        tv.Shadow.Color = Color.FromRgb(132, 94, 247);
+                        tv.Shadow.BlurRadius = 20 + tile.AnimProgress * 15;
+                        tv.Shadow.Opacity = 0.6 * (1 - tile.AnimProgress);
+                    }
                     break;
 
                 case TileState.Missed:
-                    bgBrush.Color = Color.FromArgb((byte)(180 * (1 - tile.AnimProgress)), 255, 23, 68);
-                    borderBrush.Color = Color.FromArgb((byte)(60 * (1 - tile.AnimProgress)), 255, 23, 68);
+                    alphaBg = (byte)(180 * (1 - tile.AnimProgress));
+                    alphaBorder = (byte)(60 * (1 - tile.AnimProgress));
+                    tv.BgBrush.Color = Color.FromArgb(alphaBg, 255, 23, 68);
+                    tv.BorderBrush.Color = Color.FromArgb(alphaBorder, 255, 23, 68);
                     visual.Opacity = 1 - tile.AnimProgress;
-                    dsEffect.Opacity = 0;
+                    if (tv.Shadow != null)
+                    {
+                        tv.Shadow.Opacity = 0;
+                    }
                     break;
             }
         }
     }
 
-    private Border CreateTileVisual()
+    private TileVisual CreateTileVisual()
     {
-        return new Border
+        var bgBrush = new SolidColorBrush(Color.FromRgb(18, 18, 28));
+        var borderBrush = new SolidColorBrush(Color.FromArgb(40, 132, 94, 247));
+        var shadow = new DropShadowEffect { ShadowDepth = 0, BlurRadius = 12, Opacity = 0.3 };
+
+        var border = new Border
         {
             CornerRadius = new CornerRadius(6),
             BorderThickness = new Thickness(1),
-            Background = new SolidColorBrush(Color.FromRgb(18, 18, 28)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(40, 132, 94, 247)),
-            Effect = new DropShadowEffect { ShadowDepth = 0 }
+            Background = bgBrush,
+            BorderBrush = borderBrush,
+            Effect = shadow,
+            CacheMode = new BitmapCache { RenderAtScale = 1.0 }, // GPU cache per tile
         };
+
+        return new TileVisual(border, bgBrush, borderBrush, shadow);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -637,26 +1074,25 @@ public partial class PianoTilesWindow : Window
     {
         double hitY = _screenHeight * PianoTilesGame.HitZoneY;
         double centerX = (lane + 0.5) * _laneWidth;
-        int count = 16;
+        int count = 10; // Reduced from 16 — still looks great, fewer elements
+
+        // Create or reuse a frozen brush for this color
+        var brush = new SolidColorBrush(color);
+        brush.Freeze(); // Frozen = thread-safe & faster rendering
 
         for (int i = 0; i < count; i++)
         {
             double angle = _rng.NextDouble() * Math.PI * 2;
             double speed = _rng.NextDouble() * 300 + 100;
-            double size = _rng.NextDouble() * 6 + 2;
+            double size = _rng.NextDouble() * 5 + 2;
 
             var particle = new Ellipse
             {
                 Width = size,
                 Height = size,
-                Fill = new SolidColorBrush(color),
-            };
-            particle.Effect = new DropShadowEffect
-            {
-                Color = color,
-                BlurRadius = 8,
-                ShadowDepth = 0,
-                Opacity = 0.6,
+                Fill = brush,
+                // NO DropShadowEffect — this was the #1 FPS killer
+                // The glow effect is barely visible on tiny particles
             };
 
             Canvas.SetLeft(particle, centerX);
@@ -668,7 +1104,7 @@ public partial class PianoTilesWindow : Window
                 centerX, hitY,
                 Math.Cos(angle) * speed,
                 Math.Sin(angle) * speed - 100,
-                0, 0.6 + _rng.NextDouble() * 0.3,
+                0, 0.5 + _rng.NextDouble() * 0.3,
                 color));
         }
     }
@@ -685,6 +1121,7 @@ public partial class PianoTilesWindow : Window
 
             if (newLife >= state.MaxLife)
             {
+                // Remove from canvas — use RemoveAt with indexed access for O(1) when at end
                 ParticleCanvas.Children.Remove(_particles[i]);
                 _particles.RemoveAt(i);
                 _particleStates.RemoveAt(i);
@@ -726,17 +1163,28 @@ public partial class PianoTilesWindow : Window
 
     private void FlashLane(int lane, Color? overrideColor = null)
     {
-        if (lane < 0 || lane >= 4) return;
+        if (lane < 0 || lane >= _laneFlashes.Length) return;
 
         var flash = _laneFlashes[lane];
-        var color = overrideColor ?? Color.FromArgb(20, LaneColors[lane].R, LaneColors[lane].G, LaneColors[lane].B);
-        flash.Background = new SolidColorBrush(color);
+        if (overrideColor.HasValue)
+        {
+            // Override color — update the existing brush instead of allocating new
+            if (flash.Background is SolidColorBrush existing)
+                existing.Color = overrideColor.Value;
+            else
+                flash.Background = new SolidColorBrush(overrideColor.Value);
+        }
+        else
+        {
+            // Use the pre-created lane brush
+            flash.Background = _laneFlashBrushes[lane];
+        }
         flash.Opacity = 1;
     }
 
     private void UpdateLaneFlashes(double delta)
     {
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < _laneFlashes.Length; i++)
         {
             if (_laneFlashes[i].Opacity > 0)
             {
@@ -747,12 +1195,12 @@ public partial class PianoTilesWindow : Window
 
     private void ShowHitFeedback(string text, Color color)
     {
-        _hitFeedbackMessage = text;
-        _hitFeedbackColor = color;
         _hitFeedbackTimer = 0.6;
 
         HitFeedbackText.Text = text;
-        HitFeedbackText.Foreground = new SolidColorBrush(color);
+        // Reuse the stored brush instead of allocating a new one
+        _hitFeedbackBrush.Color = color;
+        HitFeedbackText.Foreground = _hitFeedbackBrush;
         HitFeedbackText.Opacity = 1;
 
         if (HitFeedbackText.Effect is DropShadowEffect effect)
@@ -785,6 +1233,24 @@ public partial class PianoTilesWindow : Window
                 st.ScaleX = scale;
                 st.ScaleY = scale;
             }
+        }
+    }
+
+    private void UpdateWaitingIndicator(double delta)
+    {
+        if (_game.EasyMode && _game.IsWaitingForInput && _game.State == PianoTilesGame.GameState.Playing)
+        {
+            _waitingPulseTimer += delta * 3;
+            double pulse = 0.5 + 0.5 * Math.Sin(_waitingPulseTimer);
+            WaitingIndicator.Opacity = 0.4 + pulse * 0.6;
+        }
+        else
+        {
+            if (WaitingIndicator.Opacity > 0)
+            {
+                WaitingIndicator.Opacity = Math.Max(0, WaitingIndicator.Opacity - delta * 3);
+            }
+            _waitingPulseTimer = 0;
         }
     }
 

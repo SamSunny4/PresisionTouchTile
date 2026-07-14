@@ -10,17 +10,31 @@ public record HitResult(bool IsHit, TileState Quality, Tile? Tile);
 /// <summary>
 /// Core game engine for Piano Tiles.
 /// Manages tile spawning, movement, hit detection, and scoring.
+/// Supports configurable lane count (3–6), Easy Mode, and wrong-input penalties.
 /// </summary>
 public class PianoTilesGame
 {
+    // ─── Configurable Settings ────────────────────────────────────
+    public const int MinLanes = 3;
+    public const int MaxLanes = 6;
+    public const int DefaultLaneCount = 4;
+
+    /// <summary>Number of lanes for the current game session (3–6).</summary>
+    public int LaneCount { get; private set; } = DefaultLaneCount;
+
+    /// <summary>When true, tiles freeze at the hit zone and wait for player input.</summary>
+    public bool EasyMode { get; set; }
+
     // ─── Constants ─────────────────────────────────────────────────
-    public const int LaneCount = 4;
     public const double PerfectWindowMs = 80;     // ±80ms for "Perfect"
     public const double GoodWindowMs = 160;       // ±160ms for "Good"
     public const double MissWindowMs = 250;       // Past this, tile is missed
     public const double ScrollDurationMs = 2200;  // Time for tile to travel from top to hit zone
     public const double HitZoneY = 0.82;          // Hit zone position (0=top, 1=bottom)
     public const double TileHeight = 0.15;        // Tile height in normalized coordinates
+
+    // ─── Wrong input penalty ──────────────────────────────────────
+    public const int WrongHitPenalty = 25;
 
     // ─── Game State ────────────────────────────────────────────────
     public enum GameState { Menu, Countdown, Playing, Paused, GameOver }
@@ -37,6 +51,12 @@ public class PianoTilesGame
     public double ElapsedMs => _gameTimer.ElapsedMilliseconds;
     private double _countdownStartMs;
 
+    // ─── Easy Mode State ──────────────────────────────────────────
+    /// <summary>True when the game is frozen waiting for user input in Easy Mode.</summary>
+    public bool IsWaitingForInput { get; private set; }
+    /// <summary>The lane of the tile that is currently waiting for input in Easy Mode.</summary>
+    public int WaitingLane { get; private set; } = -1;
+
     // ─── Scoring ───────────────────────────────────────────────────
     public int Score { get; private set; }
     public int Combo { get; private set; }
@@ -44,6 +64,7 @@ public class PianoTilesGame
     public int PerfectCount { get; private set; }
     public int GoodCount { get; private set; }
     public int MissCount { get; private set; }
+    public int WrongHitCount { get; private set; }
     public int TotalNotes => CurrentSong?.Events.Count ?? 0;
 
     // ─── Events ────────────────────────────────────────────────────
@@ -53,6 +74,7 @@ public class PianoTilesGame
     public event Action<int>? OnCountdownTick;            // 3, 2, 1 countdown
     public event Action? OnGameOver;                      // Song finished
     public event Action? OnGameStarted;                   // Gameplay begins
+    public event Action<int>? OnWrongHit;                 // Wrong lane tapped (lane index)
 
     // ─── Latest feedback for UI ────────────────────────────────────
     public TileState? LastHitQuality { get; private set; }
@@ -61,6 +83,14 @@ public class PianoTilesGame
 
     // ─── Countdown ─────────────────────────────────────────────────
     private int _lastCountdownValue = 4;
+
+    /// <summary>
+    /// Sets the lane count for the next game. Clamped to [MinLanes, MaxLanes].
+    /// </summary>
+    public void SetLaneCount(int lanes)
+    {
+        LaneCount = Math.Clamp(lanes, MinLanes, MaxLanes);
+    }
 
     /// <summary>
     /// Starts a song with a 3-second countdown.
@@ -77,9 +107,12 @@ public class PianoTilesGame
         PerfectCount = 0;
         GoodCount = 0;
         MissCount = 0;
+        WrongHitCount = 0;
         LastHitQuality = null;
         LastHitLane = -1;
         _lastCountdownValue = 4;
+        IsWaitingForInput = false;
+        WaitingLane = -1;
 
         State = GameState.Countdown;
         _gameTimer.Restart();
@@ -126,6 +159,12 @@ public class PianoTilesGame
 
     private void UpdatePlaying()
     {
+        // In Easy Mode, if we're waiting for input, don't advance anything
+        if (EasyMode && IsWaitingForInput)
+        {
+            return;
+        }
+
         double currentTime = _gameTimer.ElapsedMilliseconds;
 
         lock (_tileLock)
@@ -164,20 +203,36 @@ public class PianoTilesGame
                     double timeSinceSpawn = currentTime - (tile.TargetTimeMs - ScrollDurationMs * HitZoneY);
                     tile.YPosition = timeSinceSpawn / ScrollDurationMs;
 
-                    // Check if tile has passed the miss window
-                    double timePastHitZone = currentTime - tile.TargetTimeMs;
-                    if (timePastHitZone > MissWindowMs)
+                    // ─── Easy Mode: freeze tile at hit zone ───────────────
+                    if (EasyMode)
                     {
-                        tile.State = TileState.Missed;
-                        tile.AnimProgress = 0;
-                        MissCount++;
-                        Combo = 0;
-                        OnComboChanged?.Invoke(Combo);
-                        OnTileMissed?.Invoke(tile);
+                        if (tile.YPosition >= HitZoneY)
+                        {
+                            tile.YPosition = HitZoneY; // clamp to hit zone
+                            // Pause the timer and wait for input
+                            _gameTimer.Stop();
+                            IsWaitingForInput = true;
+                            WaitingLane = tile.Lane;
+                            return; // Stop processing — game is now frozen
+                        }
+                    }
+                    else
+                    {
+                        // Normal mode: check if tile has passed the miss window
+                        double timePastHitZone = currentTime - tile.TargetTimeMs;
+                        if (timePastHitZone > MissWindowMs)
+                        {
+                            tile.State = TileState.Missed;
+                            tile.AnimProgress = 0;
+                            MissCount++;
+                            Combo = 0;
+                            OnComboChanged?.Invoke(Combo);
+                            OnTileMissed?.Invoke(tile);
 
-                        LastHitQuality = TileState.Missed;
-                        LastHitTime = currentTime;
-                        LastHitLane = tile.Lane;
+                            LastHitQuality = TileState.Missed;
+                            LastHitTime = currentTime;
+                            LastHitLane = tile.Lane;
+                        }
                     }
                 }
                 else
@@ -203,12 +258,70 @@ public class PianoTilesGame
     /// <summary>
     /// Attempts to hit a tile in the given lane at the current time.
     /// Returns the result of the hit attempt.
+    /// In Normal mode, wrong taps (no tile in lane) apply a penalty.
+    /// In Easy Mode, wrong taps apply a penalty but the game stays paused.
     /// </summary>
     public HitResult TryHit(int lane)
     {
         if (State != GameState.Playing)
             return new HitResult(false, TileState.Active, null);
 
+        // ─── Easy Mode hit handling ───────────────────────────────
+        if (EasyMode && IsWaitingForInput)
+        {
+            lock (_tileLock)
+            {
+                // Find the tile that is waiting at the hit zone
+                Tile? waitingTile = null;
+                foreach (var tile in ActiveTiles)
+                {
+                    if (tile.State == TileState.Active && tile.YPosition >= HitZoneY - 0.01)
+                    {
+                        waitingTile = tile;
+                        break;
+                    }
+                }
+
+                if (waitingTile == null)
+                    return new HitResult(false, TileState.Active, null);
+
+                if (lane == waitingTile.Lane)
+                {
+                    // Correct lane — always Perfect in Easy Mode
+                    waitingTile.State = TileState.HitPerfect;
+                    waitingTile.AnimProgress = 0;
+                    PerfectCount++;
+
+                    Combo++;
+                    if (Combo > MaxCombo) MaxCombo = Combo;
+                    OnComboChanged?.Invoke(Combo);
+
+                    double comboMultiplier = 1.0 + (Combo / 10.0) * 0.5;
+                    Score += (int)(100 * comboMultiplier);
+
+                    LastHitQuality = TileState.HitPerfect;
+                    LastHitTime = _gameTimer.ElapsedMilliseconds;
+                    LastHitLane = lane;
+
+                    OnTileHit?.Invoke(waitingTile, TileState.HitPerfect);
+
+                    // Resume the game
+                    IsWaitingForInput = false;
+                    WaitingLane = -1;
+                    _gameTimer.Start();
+
+                    return new HitResult(true, TileState.HitPerfect, waitingTile);
+                }
+                else
+                {
+                    // Wrong lane in Easy Mode — penalty but stay paused
+                    ApplyWrongHitPenalty(lane);
+                    return new HitResult(false, TileState.Missed, null);
+                }
+            }
+        }
+
+        // ─── Normal Mode hit handling ─────────────────────────────
         double currentTime = _gameTimer.ElapsedMilliseconds;
 
         lock (_tileLock)
@@ -233,8 +346,8 @@ public class PianoTilesGame
             if (bestTile == null)
             {
                 // Wrong tap — no tile in this lane near the hit zone
-                // Don't break combo for empty taps, just ignore
-                return new HitResult(false, TileState.Active, null);
+                ApplyWrongHitPenalty(lane);
+                return new HitResult(false, TileState.Missed, null);
             }
 
             // Determine hit quality
@@ -279,6 +392,22 @@ public class PianoTilesGame
     }
 
     /// <summary>
+    /// Applies the wrong-hit penalty: negative score, combo break, event notification.
+    /// </summary>
+    private void ApplyWrongHitPenalty(int lane)
+    {
+        WrongHitCount++;
+        Score = Math.Max(0, Score - WrongHitPenalty);
+        Combo = 0;
+        OnComboChanged?.Invoke(Combo);
+        OnWrongHit?.Invoke(lane);
+
+        LastHitQuality = TileState.Missed;
+        LastHitTime = EasyMode ? 0 : _gameTimer.ElapsedMilliseconds;
+        LastHitLane = lane;
+    }
+
+    /// <summary>
     /// Pauses the game.
     /// </summary>
     public void Pause()
@@ -298,7 +427,11 @@ public class PianoTilesGame
         if (State == GameState.Paused)
         {
             State = GameState.Playing;
-            _gameTimer.Start();
+            // In easy mode, only start timer if we're not waiting for input
+            if (!(EasyMode && IsWaitingForInput))
+            {
+                _gameTimer.Start();
+            }
         }
     }
 
@@ -312,15 +445,11 @@ public class PianoTilesGame
 
     /// <summary>
     /// Determines which lane a normalized X touchpad position maps to.
+    /// Dynamically divides into the current LaneCount.
     /// </summary>
-    public static int GetLaneFromTouchX(float normalizedX)
+    public int GetLaneFromTouchX(float normalizedX)
     {
-        return normalizedX switch
-        {
-            < 0.25f => 0,
-            < 0.50f => 1,
-            < 0.75f => 2,
-            _ => 3
-        };
+        int lane = (int)(normalizedX * LaneCount);
+        return Math.Clamp(lane, 0, LaneCount - 1);
     }
 }

@@ -21,7 +21,7 @@ public enum TileState
 /// </summary>
 public class Tile
 {
-    /// <summary>Lane index (0-3, left to right).</summary>
+    /// <summary>Lane index (0 to LaneCount-1, left to right).</summary>
     public int Lane { get; set; }
 
     /// <summary>The time (in milliseconds from song start) when this tile should reach the hit zone.</summary>
