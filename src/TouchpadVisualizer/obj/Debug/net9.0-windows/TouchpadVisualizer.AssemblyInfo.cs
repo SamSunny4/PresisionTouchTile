@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TouchpadVisualizer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2bc295782e574c894388b71684877b4ae453c7ce")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+658902162d3bceace8281b583a38f467d4f00d2b")]
 [assembly: System.Reflection.AssemblyProductAttribute("TouchpadVisualizer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TouchpadVisualizer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

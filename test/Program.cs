@@ -1,27 +1,17 @@
 using System;
-using System.Reflection;
-using Vortice.Direct3D9;
+using System.Linq;
+using TouchpadVisualizer.Game;
 
 class Program {
     static void Main() {
-        foreach (var m in typeof(IDirect3D9Ex).GetMethods()) {
-            if (m.Name.Contains("CreateDevice")) {
-                Console.Write(m.Name + "(");
-                var p = m.GetParameters();
-                for (int i=0; i<p.Length; i++) {
-                    Console.Write((i>0?", ":"") + (p[i].IsOut ? "out " : "") + p[i].ParameterType.Name + " " + p[i].Name);
-                }
-                Console.WriteLine(") -> " + m.ReturnType.Name);
-            }
-        }
-        foreach (var m in typeof(IDirect3DDevice9Ex).GetMethods()) {
-            if (m.Name.Contains("CreateTexture")) {
-                Console.Write(m.Name + "(");
-                var p = m.GetParameters();
-                for (int i=0; i<p.Length; i++) {
-                    Console.Write((i>0?", ":"") + (p[i].IsOut ? "out " : "") + p[i].ParameterType.Name + " " + p[i].Name);
-                }
-                Console.WriteLine(") -> " + m.ReturnType.Name);
+        var songs = SongPattern.GetAllSongs();
+        Console.WriteLine("=== Testing current lane mapping ===");
+        foreach (var song in songs) {
+            Console.WriteLine($"Song: {song.Name} (Original Lanes: {song.OriginalLaneCount})");
+            for (int lanes = 3; lanes <= 6; lanes++) {
+                var remapped = song.RemapToLanes(lanes);
+                var usedLanes = remapped.Events.Select(e => e.Lane).Distinct().OrderBy(l => l).ToList();
+                Console.WriteLine($"  Remapped to {lanes} lanes: Used lanes = [{string.Join(", ", usedLanes)}]");
             }
         }
     }

@@ -33,12 +33,25 @@ public class SongPattern
             return this;
 
         var remapped = new List<TileEvent>(Events.Count);
-        foreach (var evt in Events)
+        var rand = new Random(1337); // Fixed seed for deterministic song patterns
+        for (int i = 0; i < Events.Count; i++)
         {
-            // Map from [0, OriginalLaneCount) to [0, targetLaneCount)
-            // Use proportional mapping: preserve relative position
-            double normalizedPos = (evt.Lane + 0.5) / OriginalLaneCount;
-            int newLane = (int)(normalizedPos * targetLaneCount);
+            var evt = Events[i];
+            int newLane;
+            if (targetLaneCount > OriginalLaneCount)
+            {
+                // Spread notes across all lanes by applying a deterministic random offset
+                int extraLanes = targetLaneCount - OriginalLaneCount;
+                int shift = rand.Next(0, extraLanes + 1);
+                newLane = evt.Lane + shift;
+            }
+            else
+            {
+                // Map from [0, OriginalLaneCount) to [0, targetLaneCount)
+                // Use proportional mapping: preserve relative position
+                double normalizedPos = (evt.Lane + 0.5) / OriginalLaneCount;
+                newLane = (int)(normalizedPos * targetLaneCount);
+            }
             newLane = Math.Clamp(newLane, 0, targetLaneCount - 1);
             remapped.Add(new TileEvent(evt.TimeMs, newLane, evt.MidiNote, evt.DurationMs));
         }
